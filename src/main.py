@@ -1,15 +1,26 @@
 import asyncio
 import logging
 
+from src.config import get_settings
+from src.telegram.bot import create_bot, create_dispatcher
+from src.telegram.handlers import register_all_routers
+from src.telegram.middlewares import DatabaseMiddleware
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 async def main():
-    from src.config import get_settings
     settings = get_settings()
     logger.info("Bot starting...")
-    logger.info("Admin IDs: %s", settings.admin_ids)
+
+    bot = create_bot()
+    dp = create_dispatcher()
+
+    dp.update.middleware(DatabaseMiddleware())
+    register_all_routers(dp)
+
+    await dp.start_polling(bot)
 
 
 if __name__ == "__main__":

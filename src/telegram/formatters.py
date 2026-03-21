@@ -1,0 +1,42 @@
+from src.core.schemas import LessonResult, SearchResult
+
+
+def format_lesson_param(lesson: LessonResult) -> str:
+    return (
+        f"\U0001f4da {lesson.title}\n"
+        f"Вид: {lesson.lesson_type}\n"
+        f"\u2192 {lesson.url}"
+    )
+
+
+def format_lesson_text(lesson: LessonResult, index: int) -> str:
+    semantic_mark = "\U0001f916 " if lesson.is_semantic else ""
+    parts = [p for p in [lesson.subject, lesson.section, lesson.topic] if p]
+    context = " | ".join(parts)
+    return (
+        f"{index}. {semantic_mark}{context}\n"
+        f"   \U0001f4da {lesson.title}\n"
+        f"   Вид: {lesson.lesson_type}\n"
+        f"   \u2192 {lesson.url}"
+    )
+
+
+def format_param_results(lessons: list[LessonResult]) -> str:
+    if not lessons:
+        return "Ничего не найдено. Попробуйте изменить параметры поиска."
+    return "\n\n".join(format_lesson_param(l) for l in lessons)
+
+
+def format_text_results(result: SearchResult) -> str:
+    if not result.lessons:
+        return (
+            f'\U0001f50e По запросу \u00ab{result.query}\u00bb ничего не найдено.\n'
+            "Попробуйте другие ключевые слова или поиск по параметрам."
+        )
+    header = f'\U0001f50e По запросу \u00ab{result.query}\u00bb найдено {result.total} результатов:\n\n'
+    start_index = (result.page - 1) * result.per_page + 1
+    items = "\n\n".join(
+        format_lesson_text(l, start_index + i)
+        for i, l in enumerate(result.lessons)
+    )
+    return header + items
