@@ -1,5 +1,3 @@
-import pytest
-
 from src.core.services.loader import (
     parse_lessons_rows,
     parse_regions_schools_rows,
@@ -9,18 +7,19 @@ from src.core.services.loader import (
 
 def test_validate_lesson_row_valid():
     row = {
-        "Предмет": "Математика",
-        "Класс": "5",
-        "Раздел": "Алгебра",
-        "Тема": "Линейные уравнения",
-        "Урок": "Что такое уравнение",
-        "Вид": "Теория",
-        "Ссылка": "https://gosuslugi.ru/123",
+        "Предмет": "Физика",
+        "Класс": "11",
+        "Курс": "Облако знаний. Подготовка к ЕГЭ. Физика, 11 класс",
+        "Раздел": "Вступительное тестирование",
+        "Тема": "Вступительное тестирование",
+        "Урок": "КИМ ЕГЭ по физике. Тренировочный вариант 1",
+        "Ссылка УБ ЦОК": "https://www.gosuslugi.ru/edu-content/lesson/2873",
     }
     result = validate_lesson_row(row, row_num=2)
     assert result is not None
-    assert result["subject"] == "Математика"
-    assert result["grade"] == 5
+    assert result["subject"] == "Физика"
+    assert result["grade"] == 11
+    assert result["url"] == "https://www.gosuslugi.ru/edu-content/lesson/2873"
 
 
 def test_validate_lesson_row_missing_url():
@@ -30,8 +29,8 @@ def test_validate_lesson_row_missing_url():
         "Раздел": "",
         "Тема": "",
         "Урок": "Тест",
-        "Вид": "Теория",
-        "Ссылка": "",
+        "Курс": "Теория",
+        "Ссылка УБ ЦОК": "",
     }
     result = validate_lesson_row(row, row_num=2)
     assert result is None
@@ -44,8 +43,8 @@ def test_validate_lesson_row_missing_subject():
         "Раздел": "",
         "Тема": "",
         "Урок": "Тест",
-        "Вид": "Теория",
-        "Ссылка": "https://gosuslugi.ru/123",
+        "Курс": "Теория",
+        "Ссылка УБ ЦОК": "https://gosuslugi.ru/123",
     }
     result = validate_lesson_row(row, row_num=2)
     assert result is None
@@ -58,8 +57,8 @@ def test_validate_lesson_row_invalid_grade():
         "Раздел": "",
         "Тема": "",
         "Урок": "Тест",
-        "Вид": "Теория",
-        "Ссылка": "https://gosuslugi.ru/123",
+        "Курс": "Теория",
+        "Ссылка УБ ЦОК": "https://gosuslugi.ru/123",
     }
     result = validate_lesson_row(row, row_num=2)
     assert result is None
@@ -72,25 +71,26 @@ def test_validate_lesson_row_empty_optional_fields():
         "Раздел": "",
         "Тема": "",
         "Урок": "Фотосинтез",
-        "Вид": "Практика",
-        "Ссылка": "https://gosuslugi.ru/456",
+        "Курс": "",
+        "Ссылка УБ ЦОК": "https://gosuslugi.ru/456",
     }
     result = validate_lesson_row(row, row_num=3)
     assert result is not None
     assert result["section"] is None
     assert result["topic"] is None
+    assert result["lesson_type"] is None
 
 
 def test_parse_lessons_rows():
     rows = [
         {
-            "Предмет": "Математика",
-            "Класс": "5",
-            "Раздел": "Алгебра",
-            "Тема": "Уравнения",
-            "Урок": "Линейные уравнения",
-            "Вид": "Теория",
-            "Ссылка": "https://gosuslugi.ru/1",
+            "Предмет": "Физика",
+            "Класс": "11",
+            "Раздел": "Механика",
+            "Тема": "Кинематика",
+            "Урок": "Равномерное движение",
+            "Курс": "Базовый курс",
+            "Ссылка УБ ЦОК": "https://gosuslugi.ru/1",
         },
         {
             "Предмет": "",
@@ -98,8 +98,8 @@ def test_parse_lessons_rows():
             "Раздел": "",
             "Тема": "",
             "Урок": "",
-            "Вид": "",
-            "Ссылка": "",
+            "Курс": "",
+            "Ссылка УБ ЦОК": "",
         },
     ]
     lessons, errors = parse_lessons_rows(rows)

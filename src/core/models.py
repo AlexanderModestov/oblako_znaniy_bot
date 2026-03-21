@@ -75,7 +75,7 @@ class Lesson(Base):
     section: Mapped[str | None] = mapped_column(String(255), nullable=True)
     topic: Mapped[str | None] = mapped_column(String(255), nullable=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    lesson_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    lesson_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
     url: Mapped[str] = mapped_column(Text, nullable=False)
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
     embedding = mapped_column(Vector(1536), nullable=True)

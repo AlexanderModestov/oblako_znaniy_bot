@@ -13,27 +13,28 @@ from src.core.models import Lesson, Region, School, Subject
 
 logger = logging.getLogger(__name__)
 
-REQUIRED_LESSON_FIELDS = ["Предмет", "Класс", "Урок", "Вид", "Ссылка"]
+REQUIRED_LESSON_FIELDS = ["Предмет", "Класс", "Урок", "Ссылка УБ ЦОК"]
 
 
 def validate_lesson_row(row: dict, row_num: int) -> dict | None:
     for field in REQUIRED_LESSON_FIELDS:
-        if not row.get(field, "").strip():
+        value = str(row.get(field, "")).strip()
+        if not value:
             logger.warning("Row %d: missing required field '%s'", row_num, field)
             return None
     try:
-        grade = int(row["Класс"].strip())
+        grade = int(str(row["Класс"]).strip())
     except ValueError:
         logger.warning("Row %d: invalid grade '%s'", row_num, row["Класс"])
         return None
     return {
-        "subject": row["Предмет"].strip(),
+        "subject": str(row["Предмет"]).strip(),
         "grade": grade,
-        "section": row.get("Раздел", "").strip() or None,
-        "topic": row.get("Тема", "").strip() or None,
-        "title": row["Урок"].strip(),
-        "lesson_type": row["Вид"].strip(),
-        "url": row["Ссылка"].strip(),
+        "section": str(row.get("Раздел", "")).strip() or None,
+        "topic": str(row.get("Тема", "")).strip() or None,
+        "title": str(row["Урок"]).strip(),
+        "lesson_type": str(row.get("Курс", "")).strip() or None,
+        "url": str(row["Ссылка УБ ЦОК"]).strip(),
     }
 
 
