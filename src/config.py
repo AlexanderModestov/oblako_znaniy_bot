@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -15,6 +16,13 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+
+    @field_validator("admin_ids", mode="before")
+    @classmethod
+    def parse_admin_ids(cls, v):
+        if isinstance(v, str):
+            return [int(x.strip()) for x in v.split(",") if x.strip()]
+        return v
 
     @property
     def sync_database_url(self) -> str:
