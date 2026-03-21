@@ -16,6 +16,10 @@ router = Router()
 content_service = ContentService()
 
 
+def _indexed_items(values: list[str]) -> list[dict]:
+    return [{"id": i, "name": v} for i, v in enumerate(values)]
+
+
 @router.callback_query(F.data == "search_params")
 async def start_param_search(callback: CallbackQuery, state: FSMContext, session):
     subjects = await content_service.get_subjects(session)
@@ -49,10 +53,10 @@ async def select_grade(callback: CallbackQuery, state: FSMContext, session):
 
     sections = await content_service.get_sections(session, filters["subject_id"], grade)
     if sections:
-        section_items = [{"name": s} for s in sections]
+        await state.update_data(sections_list=sections)
         await callback.message.edit_text(
             "Выберите раздел:",
-            reply_markup=items_keyboard(section_items, "ps_section", add_skip=True),
+            reply_markup=items_keyboard(_indexed_items(sections), "ps_section", add_skip=True),
         )
     else:
         await _show_results(callback, state, session)
@@ -70,15 +74,16 @@ async def select_section(callback: CallbackQuery, state: FSMContext, session):
         await callback.answer()
         return
 
-    filters["section"] = value
+    section = data["sections_list"][int(value)]
+    filters["section"] = section
     await state.update_data(filter=filters)
 
-    topics = await content_service.get_topics(session, filters["subject_id"], filters["grade"], value)
+    topics = await content_service.get_topics(session, filters["subject_id"], filters["grade"], section)
     if topics:
-        topic_items = [{"name": t} for t in topics]
+        await state.update_data(topics_list=topics)
         await callback.message.edit_text(
             "Выберите тему:",
-            reply_markup=items_keyboard(topic_items, "ps_topic", add_skip=True),
+            reply_markup=items_keyboard(_indexed_items(topics), "ps_topic", add_skip=True),
         )
     else:
         await _show_results(callback, state, session)
@@ -92,7 +97,8 @@ async def select_topic(callback: CallbackQuery, state: FSMContext, session):
     filters = data["filter"]
 
     if value != "skip":
-        filters["topic"] = value
+        topic = data["topics_list"][int(value)]
+        filters["topic"] = topic
         await state.update_data(filter=filters)
 
     await _show_results(callback, state, session)

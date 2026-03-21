@@ -160,7 +160,7 @@ async def process_phone_text(message: Message, state: FSMContext):
 @router.message(OnboardingStates.email, F.text)
 async def process_email(message: Message, state: FSMContext, session):
     await state.update_data(email=message.text.strip())
-    await _finish_onboarding(message, state, session)
+    await _finish_onboarding(message, state, session, telegram_id=message.from_user.id)
 
 
 @router.callback_query(OnboardingStates.email, F.data == "onb_skip")
@@ -169,9 +169,9 @@ async def process_email_skip(callback: CallbackQuery, state: FSMContext, session
     await callback.answer()
 
 
-async def _finish_onboarding(message, state: FSMContext, session, telegram_id: int | None = None):
+async def _finish_onboarding(message, state: FSMContext, session, telegram_id: int):
     data = await state.get_data()
-    tid = telegram_id or message.from_user.id
+    tid = telegram_id
     user_data = UserCreate(
         telegram_id=tid,
         full_name=data["full_name"],
