@@ -1,10 +1,10 @@
-from pydantic import field_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     bot_token: str
-    admin_ids: list[int] = []
+    admin_ids_str: str = Field(default="", alias="ADMIN_IDS")
     database_url: str
     google_sheets_lessons_id: str
     google_sheets_schools_id: str
@@ -16,13 +16,13 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        populate_by_name = True
 
-    @field_validator("admin_ids", mode="before")
-    @classmethod
-    def parse_admin_ids(cls, v):
-        if isinstance(v, str):
-            return [int(x.strip()) for x in v.split(",") if x.strip()]
-        return v
+    @property
+    def admin_ids(self) -> list[int]:
+        if not self.admin_ids_str:
+            return []
+        return [int(x.strip()) for x in self.admin_ids_str.split(",") if x.strip()]
 
     @property
     def sync_database_url(self) -> str:
