@@ -54,7 +54,7 @@ class User(Base):
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     region_id: Mapped[int] = mapped_column(ForeignKey("regions.id"), nullable=False)
     school_id: Mapped[int] = mapped_column(ForeignKey("schools.id"), nullable=False)
-    subjects: Mapped[list[int]] = mapped_column(ARRAY(SmallInteger), default=[])
+    subjects: Mapped[list[int]] = mapped_column(ARRAY(SmallInteger), default=list)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
