@@ -5,7 +5,15 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from src.config import get_settings
-from src.core.services.loader import reload_lessons_data, reload_schools_data, reload_subjects_data
+from src.core.services.loader import (
+    reload_courses_data,
+    reload_lesson_links_data,
+    reload_lessons_data,
+    reload_schools_data,
+    reload_sections_data,
+    reload_subjects_data,
+    reload_topics_data,
+)
 from src.core.services.user import UserService
 
 router = Router()
@@ -26,15 +34,7 @@ async def cmd_reload(message: Message, session):
 
     await message.answer("\u23f3 Загрузка данных...")
 
-    try:
-        subjects_result = await reload_subjects_data(session)
-        await message.answer(
-            f"\u2705 Предметы: {subjects_result['subjects']} загружено"
-        )
-    except Exception as e:
-        logger.exception("Failed to reload subjects")
-        await message.answer(f"\u274c Ошибка загрузки предметов: {e}")
-
+    # 1. Schools (regions → municipalities → schools)
     try:
         schools_result = await reload_schools_data(session)
         await message.answer(
@@ -45,7 +45,53 @@ async def cmd_reload(message: Message, session):
     except Exception as e:
         logger.exception("Failed to reload schools")
         await message.answer(f"\u274c Ошибка загрузки школ: {e}")
+        return
 
+    # 2. Subjects
+    try:
+        subjects_result = await reload_subjects_data(session)
+        await message.answer(
+            f"\u2705 Предметы: {subjects_result['subjects']} загружено"
+        )
+    except Exception as e:
+        logger.exception("Failed to reload subjects")
+        await message.answer(f"\u274c Ошибка загрузки предметов: {e}")
+        return
+
+    # 3. Courses
+    try:
+        courses_result = await reload_courses_data(session)
+        await message.answer(
+            f"\u2705 Курсы: {courses_result['courses']} загружено"
+        )
+    except Exception as e:
+        logger.exception("Failed to reload courses")
+        await message.answer(f"\u274c Ошибка загрузки курсов: {e}")
+        return
+
+    # 4. Sections
+    try:
+        sections_result = await reload_sections_data(session)
+        await message.answer(
+            f"\u2705 Разделы: {sections_result['sections']} загружено"
+        )
+    except Exception as e:
+        logger.exception("Failed to reload sections")
+        await message.answer(f"\u274c Ошибка загрузки разделов: {e}")
+        return
+
+    # 5. Topics
+    try:
+        topics_result = await reload_topics_data(session)
+        await message.answer(
+            f"\u2705 Темы: {topics_result['topics']} загружено"
+        )
+    except Exception as e:
+        logger.exception("Failed to reload topics")
+        await message.answer(f"\u274c Ошибка загрузки тем: {e}")
+        return
+
+    # 6. Lessons
     try:
         lessons_result = await reload_lessons_data(session)
         emb_status = "\u2705" if lessons_result["embeddings"] else "\u26a0\ufe0f без эмбеддингов"
@@ -59,6 +105,20 @@ async def cmd_reload(message: Message, session):
     except Exception as e:
         logger.exception("Failed to reload lessons")
         await message.answer(f"\u274c Ошибка загрузки уроков: {e}")
+        return
+
+    # 7. Lesson links
+    try:
+        links_result = await reload_lesson_links_data(session)
+        await message.answer(
+            f"\u2705 Ссылки: {links_result['links']} загружено"
+        )
+    except Exception as e:
+        logger.exception("Failed to reload lesson links")
+        await message.answer(f"\u274c Ошибка загрузки ссылок: {e}")
+        return
+
+    await message.answer("\u2705 Загрузка данных завершена!")
 
 
 @router.message(Command("stats"))
