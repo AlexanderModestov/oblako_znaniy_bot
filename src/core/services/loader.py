@@ -91,6 +91,14 @@ def fetch_schools_from_sheets() -> list[dict]:
     return sheet.get_all_records()
 
 
+def fetch_subjects_from_sheets() -> list[dict]:
+    settings = get_settings()
+    client = _get_gspread_client()
+    spreadsheet = client.open_by_key(settings.google_sheets_lessons_id)
+    sheet = spreadsheet.worksheet("subject")
+    return sheet.get_all_records()
+
+
 async def generate_embeddings(texts: list[str]) -> list[list[float]]:
     settings = get_settings()
     client = AsyncOpenAI(api_key=settings.openai_api_key)
@@ -104,6 +112,23 @@ async def generate_embeddings(texts: list[str]) -> list[list[float]]:
         )
         embeddings.extend([item.embedding for item in response.data])
     return embeddings
+
+
+async def reload_subjects_data(session: AsyncSession) -> dict:
+    rows = fetch_subjects_from_sheets()
+    subject_names = []
+    for row in rows:
+        name = str(row.get("Name", "")).strip()
+        if name:
+            subject_names.append(name)
+
+    if subject_names:
+        stmt = pg_insert(Subject).values([{"name": n} for n in subject_names])
+        stmt = stmt.on_conflict_do_nothing(index_elements=["name"])
+        await session.execute(stmt)
+        await session.commit()
+
+    return {"subjects": len(subject_names)}
 
 
 async def reload_schools_data(session: AsyncSession) -> dict:
