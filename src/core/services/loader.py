@@ -72,11 +72,16 @@ def _get_gspread_client() -> gspread.Client:
     return gspread.authorize(creds)
 
 
+EXPECTED_HEADERS = [
+    "ИД урока", "Предмет", "Класс", "Курс", "Раздел", "Тема", "Урок", "Ссылка УБ ЦОК",
+]
+
+
 def fetch_lessons_from_sheets() -> list[dict]:
     settings = get_settings()
     client = _get_gspread_client()
     sheet = client.open_by_key(settings.google_sheets_lessons_id).sheet1
-    return sheet.get_all_records()
+    return sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
 
 
 def fetch_schools_from_sheets() -> list[dict]:
