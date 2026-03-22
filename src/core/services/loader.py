@@ -110,65 +110,83 @@ async def reload_schools_data(session: AsyncSession) -> dict:
     rows = fetch_schools_from_sheets()
     regions_set, schools_list = parse_regions_schools_rows(rows)
 
-    for name in regions_set:
-        stmt = pg_insert(Region).values(name=name).on_conflict_do_nothing(index_elements=["name"])
+    # Batch upsert regions
+    if regions_set:
+        stmt = pg_insert(Region).values([{"name": n} for n in regions_set])
+        stmt = stmt.on_conflict_do_nothing(index_elements=["name"])
         await session.execute(stmt)
-    await session.flush()
+        await session.flush()
 
     result = await session.execute(select(Region))
     region_map = {r.name: r.id for r in result.scalars().all()}
 
+    # Batch upsert schools in chunks of 500
+    school_values = []
     for item in schools_list:
         region_id = region_map.get(item["region"])
         if region_id:
-            stmt = (
-                pg_insert(School)
-                .values(region_id=region_id, name=item["school"])
-                .on_conflict_do_nothing(constraint="uq_schools_region_id_name")
-            )
-            await session.execute(stmt)
+            school_values.append({"region_id": region_id, "name": item["school"]})
+
+    for i in range(0, len(school_values), 500):
+        batch = school_values[i : i + 500]
+        stmt = pg_insert(School).values(batch)
+        stmt = stmt.on_conflict_do_nothing(constraint="uq_schools_region_id_name")
+        await session.execute(stmt)
 
     await session.commit()
-    return {"regions": len(regions_set), "schools": len(schools_list)}
+    return {"regions": len(regions_set), "schools": len(school_values)}
 
 
 async def reload_lessons_data(session: AsyncSession) -> dict:
+    logger.info("Fetching lessons from Google Sheets...")
     rows = fetch_lessons_from_sheets()
     lessons, errors = parse_lessons_rows(rows)
+    logger.info("Parsed %d lessons, %d errors", len(lessons), len(errors))
 
+    # Batch upsert subjects
     subject_names = {lesson["subject"] for lesson in lessons}
-    for name in subject_names:
-        stmt = pg_insert(Subject).values(name=name).on_conflict_do_nothing(index_elements=["name"])
+    if subject_names:
+        stmt = pg_insert(Subject).values([{"name": n} for n in subject_names])
+        stmt = stmt.on_conflict_do_nothing(index_elements=["name"])
         await session.execute(stmt)
-    await session.flush()
+        await session.flush()
 
     result = await session.execute(select(Subject))
     subject_map = {s.name: s.id for s in result.scalars().all()}
 
     await session.execute(delete(Lesson))
 
+    # Generate embeddings
     texts = [
         " ".join(filter(None, [l["title"], l["section"], l["topic"]]))
         for l in lessons
     ]
     try:
+        logger.info("Generating embeddings for %d lessons...", len(texts))
         embeddings = await generate_embeddings(texts)
     except Exception:
         logger.exception("Failed to generate embeddings")
         embeddings = [None] * len(lessons)
 
-    for i, lesson in enumerate(lessons):
-        db_lesson = Lesson(
-            subject_id=subject_map[lesson["subject"]],
-            grade=lesson["grade"],
-            section=lesson["section"],
-            topic=lesson["topic"],
-            title=lesson["title"],
-            lesson_type=lesson["lesson_type"],
-            url=lesson["url"],
-            embedding=embeddings[i],
-        )
-        session.add(db_lesson)
+    # Batch insert lessons in chunks of 500
+    for i in range(0, len(lessons), 500):
+        batch = lessons[i : i + 500]
+        batch_embeddings = embeddings[i : i + 500]
+        values = [
+            {
+                "subject_id": subject_map[lesson["subject"]],
+                "grade": lesson["grade"],
+                "section": lesson["section"],
+                "topic": lesson["topic"],
+                "title": lesson["title"],
+                "lesson_type": lesson["lesson_type"],
+                "url": lesson["url"],
+                "embedding": batch_embeddings[j],
+            }
+            for j, lesson in enumerate(batch)
+        ]
+        await session.execute(Lesson.__table__.insert(), values)
+        logger.info("Inserted lessons %d-%d of %d", i + 1, min(i + 500, len(lessons)), len(lessons))
 
     await session.commit()
     return {
