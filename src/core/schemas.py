@@ -22,8 +22,8 @@ class UserCreate(BaseModel):
 
 class LessonResult(BaseModel):
     title: str
-    lesson_type: str
     url: str
+    description: str | None = None
     subject: str | None = None
     section: str | None = None
     topic: str | None = None
@@ -45,5 +45,6 @@ class SearchResult(BaseModel):
 class FilterState(BaseModel):
     subject_id: int | None = None
     grade: int | None = None
-    section: str | None = None
-    topic: str | None = None
+    course_id: int | None = None
+    section_id: int | None = None
+    topic_id: int | None = None

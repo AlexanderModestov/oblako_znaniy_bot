@@ -3,6 +3,7 @@ import logging
 from openai import AsyncOpenAI
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from src.config import get_settings
 from src.core.models import Lesson, Subject
@@ -28,6 +29,7 @@ class SearchService:
         offset = (page - 1) * self.per_page
         q = (
             select(Lesson).join(Subject)
+            .options(joinedload(Lesson.section), joinedload(Lesson.topic))
             .where(Lesson.search_vector.op("@@")(ts_query))
             .order_by(func.ts_rank(Lesson.search_vector, ts_query).desc())
             .offset(offset).limit(self.per_page)
@@ -36,11 +38,14 @@ class SearchService:
 
         lessons = [
             LessonResult(
-                title=l.title, lesson_type=l.lesson_type, url=l.url,
-                subject=l.subject.name, section=l.section, topic=l.topic,
+                title=l.title, url=l.url,
+                description=l.description,
+                subject=l.subject.name,
+                section=l.section.name if l.section else None,
+                topic=l.topic.name if l.topic else None,
                 is_semantic=False,
             )
-            for l in result.scalars().all()
+            for l in result.scalars().unique().all()
         ]
         return lessons, total
 
@@ -56,7 +61,9 @@ class SearchService:
 
         q = (
             select(Lesson, Lesson.embedding.cosine_distance(query_embedding).label("distance"))
-            .join(Subject).where(Lesson.embedding.is_not(None))
+            .join(Subject)
+            .options(joinedload(Lesson.section), joinedload(Lesson.topic), joinedload(Lesson.subject))
+            .where(Lesson.embedding.is_not(None))
         )
         if exclude_ids:
             q = q.where(Lesson.id.notin_(exclude_ids))
@@ -71,8 +78,11 @@ class SearchService:
             if similarity >= self.similarity_threshold:
                 lessons.append(
                     LessonResult(
-                        title=lesson.title, lesson_type=lesson.lesson_type, url=lesson.url,
-                        subject=lesson.subject.name, section=lesson.section, topic=lesson.topic,
+                        title=lesson.title, url=lesson.url,
+                        description=lesson.description,
+                        subject=lesson.subject.name,
+                        section=lesson.section.name if lesson.section else None,
+                        topic=lesson.topic.name if lesson.topic else None,
                         is_semantic=True,
                     )
                 )
