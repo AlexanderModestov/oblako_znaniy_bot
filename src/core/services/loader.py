@@ -281,12 +281,17 @@ async def reload_courses_data(session: AsyncSession, rows: list[dict]) -> dict:
 
 async def reload_sections_data(session: AsyncSession, rows: list[dict]) -> dict:
     """Parse 'Разделы' tab. Upsert on id."""
+    if rows:
+        logger.info("Sections first row keys: %s", list(rows[0].keys()))
+        logger.info("Sections first row: %s", {k: repr(v)[:50] for k, v in rows[0].items()})
     values = []
+    skipped = 0
     for row in rows:
         section_id = _int_or_none(row, "ИД раздела")
         course_id = _int_or_none(row, "ИД курса")
         name = _str(row, "Наименование")
         if section_id is None or course_id is None or not name:
+            skipped += 1
             continue
         values.append({
             "id": section_id,
@@ -316,6 +321,7 @@ async def reload_sections_data(session: AsyncSession, rows: list[dict]) -> dict:
         await session.execute(stmt)
 
     await session.commit()
+    logger.info("Sections: %d loaded, %d skipped", len(values), skipped)
     return {"sections": len(values)}
 
 
@@ -445,13 +451,21 @@ async def reload_lesson_links_data(session: AsyncSession, rows: list[dict]) -> d
 
     await session.execute(delete(LessonLink))
 
+    # Get existing lesson IDs to skip orphaned links
+    result = await session.execute(select(Lesson.id))
+    existing_lesson_ids = {row[0] for row in result.all()}
+
     link_values = []
+    skipped = 0
     for row in rows:
         lesson_id = _int_or_none(row, "ИД урока")
         if not lesson_id:
             continue
         url = _str(row, "URL  в УБ ЦОК")
         if not url:
+            continue
+        if lesson_id not in existing_lesson_ids:
+            skipped += 1
             continue
         link_values.append({"lesson_id": lesson_id, "url": url})
 
@@ -460,4 +474,6 @@ async def reload_lesson_links_data(session: AsyncSession, rows: list[dict]) -> d
         await session.execute(LessonLink.__table__.insert(), batch)
 
     await session.commit()
+    if skipped:
+        logger.warning("Skipped %d lesson links with non-existent lesson_id", skipped)
     return {"links": len(link_values)}
