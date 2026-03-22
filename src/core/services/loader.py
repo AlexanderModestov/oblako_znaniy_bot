@@ -13,7 +13,6 @@ from src.core.models import (
     Course,
     Lesson,
     LessonLink,
-    Municipality,
     Region,
     School,
     Section,
@@ -174,25 +173,24 @@ async def generate_embeddings(texts: list[str]) -> list[list[float]]:
 # ---------------------------------------------------------------------------
 
 async def reload_schools_data(session: AsyncSession) -> dict:
-    """Parse rows with columns: Регион, Наименование муниципалитета, Школа."""
+    """Parse rows with columns: Регион, municipality, Наименование муниципалитета, Школа."""
     rows = fetch_schools_from_sheets()
 
     regions_set: set[str] = set()
-    municipalities_dict: dict[tuple[str, str], None] = {}
     schools_list: list[dict] = []
 
     for row in rows:
         region = _str(row, "Регион")
-        municipality = _str(row, "Наименование муниципалитета")
+        municipality = _str(row, "municipality") or None
+        municipality_name = _str(row, "Наименование муниципалитета") or None
         school = _str(row, "Школа")
         if region:
             regions_set.add(region)
-        if region and municipality:
-            municipalities_dict[(region, municipality)] = None
         if region and school:
             schools_list.append({
                 "region": region,
-                "municipality": municipality or None,
+                "municipality": municipality,
+                "municipality_name": municipality_name,
                 "school": school,
             })
 
@@ -206,46 +204,27 @@ async def reload_schools_data(session: AsyncSession) -> dict:
     result = await session.execute(select(Region))
     region_map = {r.name: r.id for r in result.scalars().all()}
 
-    # Upsert municipalities
-    muni_values = []
-    for (region_name, muni_name) in municipalities_dict:
-        region_id = region_map.get(region_name)
-        if region_id and muni_name:
-            muni_values.append({"region_id": region_id, "name": muni_name})
-
-    for i in range(0, len(muni_values), BATCH_SIZE):
-        batch = muni_values[i : i + BATCH_SIZE]
-        stmt = pg_insert(Municipality).values(batch)
-        stmt = stmt.on_conflict_do_nothing(constraint="uq_municipalities_region_id_name")
-        await session.execute(stmt)
-    await session.flush()
-
-    # Build municipality map using (region_id, name) as key
-    result = await session.execute(select(Municipality))
-    region_id_to_name = {rid: rn for rn, rid in region_map.items()}
-    muni_map = {}
-    for m in result.scalars().all():
-        region_name = region_id_to_name.get(m.region_id)
-        if region_name:
-            muni_map[(region_name, m.name)] = m.id
-
     # Upsert schools
     school_values = []
     for item in schools_list:
-        muni_id = muni_map.get((item["region"], item["municipality"]))
-        if muni_id:
-            school_values.append({"municipality_id": muni_id, "name": item["school"]})
+        region_id = region_map.get(item["region"])
+        if region_id:
+            school_values.append({
+                "region_id": region_id,
+                "municipality": item["municipality"],
+                "municipality_name": item["municipality_name"],
+                "name": item["school"],
+            })
 
     for i in range(0, len(school_values), BATCH_SIZE):
         batch = school_values[i : i + BATCH_SIZE]
         stmt = pg_insert(School).values(batch)
-        stmt = stmt.on_conflict_do_nothing(constraint="uq_schools_municipality_id_name")
+        stmt = stmt.on_conflict_do_nothing(constraint="uq_schools_region_id_name")
         await session.execute(stmt)
 
     await session.commit()
     return {
         "regions": len(regions_set),
-        "municipalities": len(muni_values),
         "schools": len(school_values),
     }
 

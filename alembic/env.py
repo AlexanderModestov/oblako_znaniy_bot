@@ -3,7 +3,7 @@ from sqlalchemy import engine_from_config, pool
 
 from src.core.database import Base
 from src.core.models import (  # noqa: F401
-    Region, Municipality, School, Subject, Course, Section, Topic,
+    Region, School, Subject, Course, Section, Topic,
     Lesson, LessonLink, User,
 )
 from src.config import get_settings

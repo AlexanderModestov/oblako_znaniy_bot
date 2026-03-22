@@ -24,36 +24,22 @@ class Region(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
 
-    municipalities: Mapped[list["Municipality"]] = relationship(back_populates="region")
-
-
-class Municipality(Base):
-    __tablename__ = "municipalities"
-    __table_args__ = (
-        UniqueConstraint("region_id", "name", name="uq_municipalities_region_id_name"),
-    )
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    region_id: Mapped[int] = mapped_column(ForeignKey("regions.id"), nullable=False)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-
-    region: Mapped["Region"] = relationship(back_populates="municipalities")
-    schools: Mapped[list["School"]] = relationship(back_populates="municipality")
+    schools: Mapped[list["School"]] = relationship(back_populates="region")
 
 
 class School(Base):
     __tablename__ = "schools"
     __table_args__ = (
-        UniqueConstraint("municipality_id", "name", name="uq_schools_municipality_id_name"),
+        UniqueConstraint("region_id", "name", name="uq_schools_region_id_name"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    municipality_id: Mapped[int | None] = mapped_column(
-        ForeignKey("municipalities.id"), nullable=True
-    )
+    region_id: Mapped[int] = mapped_column(ForeignKey("regions.id"), nullable=False)
+    municipality: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    municipality_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    municipality: Mapped["Municipality"] = relationship(back_populates="schools")
+    region: Mapped["Region"] = relationship(back_populates="schools")
 
 
 class Subject(Base):

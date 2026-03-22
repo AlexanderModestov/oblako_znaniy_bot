@@ -1,4 +1,4 @@
-from src.core.models import User, Region, Municipality, School, Subject, Course, Section, Topic, Lesson, LessonLink
+from src.core.models import User, Region, School, Subject, Course, Section, Topic, Lesson, LessonLink
 
 
 def test_user_model_has_required_fields():
@@ -28,13 +28,10 @@ def test_region_model():
     assert hasattr(Region, "name")
 
 
-def test_municipality_model():
-    assert hasattr(Municipality, "region_id")
-    assert hasattr(Municipality, "name")
-
-
 def test_school_model():
-    assert hasattr(School, "municipality_id")
+    assert hasattr(School, "region_id")
+    assert hasattr(School, "municipality")
+    assert hasattr(School, "municipality_name")
     assert hasattr(School, "name")
 
 

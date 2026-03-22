@@ -23,16 +23,6 @@ def upgrade() -> None:
     # --- New tables ---
 
     op.create_table(
-        "municipalities",
-        sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("region_id", sa.Integer(), nullable=False),
-        sa.Column("name", sa.String(length=255), nullable=False),
-        sa.ForeignKeyConstraint(["region_id"], ["regions.id"]),
-        sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("region_id", "name", name="uq_municipalities_region_id_name"),
-    )
-
-    op.create_table(
         "courses",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("name", sa.String(length=255), nullable=False),
@@ -108,23 +98,10 @@ def upgrade() -> None:
     op.drop_column("lessons", "topic")
     op.drop_column("lessons", "lesson_type")
 
-    # --- Modify schools ---
+    # --- Modify schools: add municipality columns ---
 
-    # Drop constraint and old column, add new municipality_id
-    op.drop_constraint("uq_schools_region_id_name", "schools", type_="unique")
-    op.drop_column("schools", "region_id")
-    op.add_column(
-        "schools",
-        sa.Column("municipality_id", sa.Integer(), nullable=True),
-    )
-    op.create_foreign_key(
-        "fk_schools_municipality_id", "schools", "municipalities",
-        ["municipality_id"], ["id"],
-    )
-    op.create_unique_constraint(
-        "uq_schools_municipality_id_name", "schools",
-        ["municipality_id", "name"],
-    )
+    op.add_column("schools", sa.Column("municipality", sa.String(length=255), nullable=True))
+    op.add_column("schools", sa.Column("municipality_name", sa.String(length=255), nullable=True))
 
     # --- Update search vector trigger ---
 
@@ -171,15 +148,8 @@ def downgrade() -> None:
 
     # --- Restore schools ---
 
-    op.drop_constraint("uq_schools_municipality_id_name", "schools", type_="unique")
-    op.drop_constraint("fk_schools_municipality_id", "schools", type_="foreignkey")
-    op.drop_column("schools", "municipality_id")
-    op.add_column(
-        "schools",
-        sa.Column("region_id", sa.Integer(), nullable=False),
-    )
-    op.create_foreign_key(None, "schools", "regions", ["region_id"], ["id"])
-    op.create_unique_constraint("uq_schools_region_id_name", "schools", ["region_id", "name"])
+    op.drop_column("schools", "municipality_name")
+    op.drop_column("schools", "municipality")
 
     # --- Restore lessons ---
 
@@ -206,4 +176,3 @@ def downgrade() -> None:
     op.drop_table("topics")
     op.drop_table("sections")
     op.drop_table("courses")
-    op.drop_table("municipalities")

@@ -34,12 +34,11 @@ async def cmd_reload(message: Message, session):
 
     await message.answer("\u23f3 Загрузка данных...")
 
-    # 1. Schools (regions → municipalities → schools)
+    # 1. Schools (regions → schools)
     try:
         schools_result = await reload_schools_data(session)
         await message.answer(
             f"\u2705 Регионы: {schools_result['regions']}, "
-            f"Муниципалитеты: {schools_result['municipalities']}, "
             f"Школы: {schools_result['schools']}"
         )
     except Exception as e:
