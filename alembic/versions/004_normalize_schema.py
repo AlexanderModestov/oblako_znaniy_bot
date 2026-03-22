@@ -39,7 +39,7 @@ def upgrade() -> None:
 
     op.create_table(
         "sections",
-        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("id", sa.String(50), nullable=False),
         sa.Column("course_id", sa.Integer(), nullable=False),
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
@@ -56,8 +56,8 @@ def upgrade() -> None:
 
     op.create_table(
         "topics",
-        sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("section_id", sa.Integer(), nullable=False),
+        sa.Column("id", sa.String(50), nullable=False),
+        sa.Column("section_id", sa.String(50), nullable=False),
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("actual", sa.Boolean(), nullable=True, server_default=sa.text("true")),
@@ -90,8 +90,8 @@ def upgrade() -> None:
 
     op.add_column("lessons", sa.Column("course_id", sa.Integer(), nullable=True))
     op.add_column("lessons", sa.Column("description", sa.Text(), nullable=True))
-    op.add_column("lessons", sa.Column("section_id", sa.Integer(), nullable=True))
-    op.add_column("lessons", sa.Column("topic_id", sa.Integer(), nullable=True))
+    op.add_column("lessons", sa.Column("section_id", sa.String(50), nullable=True))
+    op.add_column("lessons", sa.Column("topic_id", sa.String(50), nullable=True))
 
     op.create_foreign_key("fk_lessons_course_id", "lessons", "courses", ["course_id"], ["id"])
     op.create_foreign_key("fk_lessons_section_id", "lessons", "sections", ["section_id"], ["id"])

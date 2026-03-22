@@ -88,7 +88,7 @@ class Course(Base):
 class Section(Base):
     __tablename__ = "sections"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[str] = mapped_column(String(50), primary_key=True)
     course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -107,8 +107,8 @@ class Section(Base):
 class Topic(Base):
     __tablename__ = "topics"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    section_id: Mapped[int] = mapped_column(ForeignKey("sections.id"), nullable=False)
+    id: Mapped[str] = mapped_column(String(50), primary_key=True)
+    section_id: Mapped[str] = mapped_column(String(50), ForeignKey("sections.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     actual: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -137,11 +137,11 @@ class Lesson(Base):
     course_id: Mapped[int | None] = mapped_column(
         ForeignKey("courses.id"), nullable=True
     )
-    section_id: Mapped[int | None] = mapped_column(
-        ForeignKey("sections.id"), nullable=True
+    section_id: Mapped[str | None] = mapped_column(
+        String(50), ForeignKey("sections.id"), nullable=True
     )
-    topic_id: Mapped[int | None] = mapped_column(
-        ForeignKey("topics.id"), nullable=True
+    topic_id: Mapped[str | None] = mapped_column(
+        String(50), ForeignKey("topics.id"), nullable=True
     )
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
     embedding = mapped_column(Vector(1536), nullable=True)

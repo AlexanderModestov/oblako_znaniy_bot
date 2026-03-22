@@ -281,20 +281,17 @@ async def reload_courses_data(session: AsyncSession, rows: list[dict]) -> dict:
 
 async def reload_sections_data(session: AsyncSession, rows: list[dict]) -> dict:
     """Parse 'Разделы' tab. Upsert on id."""
-    if rows:
-        logger.info("Sections first row keys: %s", list(rows[0].keys()))
-        logger.info("Sections first row: %s", {k: repr(v)[:50] for k, v in rows[0].items()})
     values = []
     skipped = 0
     for row in rows:
-        section_id = _int_or_none(row, "ИД раздела")
+        section_id = _str(row, "ИД раздела")
         course_id = _int_or_none(row, "ИД курса")
         name = _str(row, "Наименование")
-        if section_id is None or course_id is None or not name:
+        if not section_id or course_id is None or not name:
             skipped += 1
             continue
         values.append({
-            "id": section_id,
+            "id": section_id,  # string like "s12581437"
             "course_id": course_id,
             "name": name,
             "description": _str(row, "Описание") or None,
@@ -329,14 +326,14 @@ async def reload_topics_data(session: AsyncSession, rows: list[dict]) -> dict:
     """Parse 'Темы' tab. Upsert on id. NOTE: No 'Стандарты' column."""
     values = []
     for row in rows:
-        topic_id = _int_or_none(row, "ИД темы")
-        section_id = _int_or_none(row, "ИД раздела")
+        topic_id = _str(row, "ИД темы")
+        section_id = _str(row, "ИД раздела")
         name = _str(row, "Наименование")
-        if topic_id is None or section_id is None or not name:
+        if not topic_id or not section_id or not name:
             continue
         values.append({
-            "id": topic_id,
-            "section_id": section_id,
+            "id": topic_id,  # string like "t12581437"
+            "section_id": section_id,  # string like "s12581437"
             "name": name,
             "description": _str(row, "Описание") or None,
             "actual": _bool_field(row, "Актуальность"),
@@ -401,8 +398,8 @@ async def reload_lessons_data(session: AsyncSession, rows: list[dict]) -> dict:
             "url": url,
             "description": _str(row, "Описание урока") or None,
             "course_id": _int_or_none(row, "Курс"),
-            "section_id": _int_or_none(row, "Раздел"),
-            "topic_id": _int_or_none(row, "Тема"),
+            "section_id": _str(row, "Раздел") or None,
+            "topic_id": _str(row, "Тема") or None,
         })
 
     logger.info("Parsed %d lessons, %d errors", len(lessons), len(errors))
