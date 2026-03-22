@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from aiogram import Router
@@ -48,8 +49,10 @@ async def cmd_reload(message: Message, session):
         await message.answer(f"\u274c Ошибка загрузки школ: {e}")
         return
 
-    # 2. Fetch all content tabs at once (1 API call for spreadsheet)
+    # 2. Fetch all content tabs at once — pause to avoid rate limiting
     try:
+        await message.answer("\u23f3 Ожидание перед загрузкой контента (квота API)...")
+        await asyncio.sleep(60)
         await message.answer("\u23f3 Загрузка контента из Google Sheets...")
         content = fetch_all_content_from_sheets()
     except Exception as e:
