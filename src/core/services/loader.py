@@ -70,6 +70,9 @@ def _get_gspread_client() -> gspread.Client:
 # Fetch functions (read from Google Sheets)
 # ---------------------------------------------------------------------------
 
+EXPECTED_SCHOOL_HEADERS = ["Регион", "municipality", "Наименование муниципалитета", "Школа"]
+
+
 def fetch_schools_from_sheets() -> list[dict]:
     """Open spreadsheet by schools_id, read ALL worksheets EXCEPT the first one."""
     settings = get_settings()
@@ -78,7 +81,7 @@ def fetch_schools_from_sheets() -> list[dict]:
     worksheets = spreadsheet.worksheets()
     all_rows: list[dict] = []
     for ws in worksheets[1:]:  # skip first worksheet
-        all_rows.extend(ws.get_all_records())
+        all_rows.extend(ws.get_all_records(expected_headers=EXPECTED_SCHOOL_HEADERS))
     return all_rows
 
 
