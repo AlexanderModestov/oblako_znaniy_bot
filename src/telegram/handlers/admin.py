@@ -117,7 +117,7 @@ async def cmd_reload(message: Message, session):
             await message.answer(f"Строки с ошибками: {lessons_result['error_rows'][:20]}")
     except Exception as e:
         logger.exception("Failed to reload lessons")
-        await message.answer(f"\u274c Ошибка загрузки уроков: {e}")
+        await message.answer(f"\u274c Ошибка загрузки уроков: {str(e)[:200]}")
         return
 
     # 8. Lesson links

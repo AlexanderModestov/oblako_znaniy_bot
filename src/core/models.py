@@ -128,7 +128,7 @@ class Lesson(Base):
         Index("ix_lessons_search_vector", "search_vector", postgresql_using="gin"),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     subject_id: Mapped[int] = mapped_column(ForeignKey("subjects.id"), nullable=False)
     grade: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -159,7 +159,7 @@ class LessonLink(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     lesson_id: Mapped[int] = mapped_column(
-        ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False
+        BigInteger, ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False
     )
     url: Mapped[str] = mapped_column(Text, nullable=False)
 

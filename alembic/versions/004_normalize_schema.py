@@ -73,7 +73,7 @@ def upgrade() -> None:
     op.create_table(
         "lesson_links",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("lesson_id", sa.Integer(), nullable=False),
+        sa.Column("lesson_id", sa.BigInteger(), nullable=False),
         sa.Column("url", sa.Text(), nullable=False),
         sa.ForeignKeyConstraint(["lesson_id"], ["lessons.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
@@ -84,6 +84,9 @@ def upgrade() -> None:
     op.add_column("subjects", sa.Column("code", sa.String(length=50), nullable=True))
 
     # --- Modify lessons ---
+
+    # lesson IDs from Google Sheets exceed int32 range
+    op.alter_column("lessons", "id", type_=sa.BigInteger())
 
     op.add_column("lessons", sa.Column("course_id", sa.Integer(), nullable=True))
     op.add_column("lessons", sa.Column("description", sa.Text(), nullable=True))
