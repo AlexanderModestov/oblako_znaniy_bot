@@ -28,6 +28,10 @@ def is_admin(user_id: int) -> bool:
     return user_id in get_settings().admin_ids
 
 
+def _short_error(e: Exception) -> str:
+    return str(e)[:200]
+
+
 @router.message(Command("reload"))
 async def cmd_reload(message: Message, session):
     logger.info("Reload requested by user_id=%s, admin_ids=%s", message.from_user.id, get_settings().admin_ids)
@@ -46,7 +50,7 @@ async def cmd_reload(message: Message, session):
         )
     except Exception as e:
         logger.exception("Failed to reload schools")
-        await message.answer(f"\u274c Ошибка загрузки школ: {e}")
+        await message.answer(f"\u274c Ошибка загрузки школ: {_short_error(e)}")
         return
 
     # 2. Fetch all content tabs at once — pause to avoid rate limiting
@@ -57,7 +61,7 @@ async def cmd_reload(message: Message, session):
         content = fetch_all_content_from_sheets()
     except Exception as e:
         logger.exception("Failed to fetch content from sheets")
-        await message.answer(f"\u274c Ошибка загрузки из Google Sheets: {e}")
+        await message.answer(f"\u274c Ошибка загрузки из Google Sheets: {_short_error(e)}")
         return
 
     # 3. Subjects
@@ -68,7 +72,7 @@ async def cmd_reload(message: Message, session):
         )
     except Exception as e:
         logger.exception("Failed to reload subjects")
-        await message.answer(f"\u274c Ошибка загрузки предметов: {e}")
+        await message.answer(f"\u274c Ошибка загрузки предметов: {_short_error(e)}")
         return
 
     # 4. Courses
@@ -79,7 +83,7 @@ async def cmd_reload(message: Message, session):
         )
     except Exception as e:
         logger.exception("Failed to reload courses")
-        await message.answer(f"\u274c Ошибка загрузки курсов: {e}")
+        await message.answer(f"\u274c Ошибка загрузки курсов: {_short_error(e)}")
         return
 
     # 5. Sections
@@ -90,7 +94,7 @@ async def cmd_reload(message: Message, session):
         )
     except Exception as e:
         logger.exception("Failed to reload sections")
-        await message.answer(f"\u274c Ошибка загрузки разделов: {e}")
+        await message.answer(f"\u274c Ошибка загрузки разделов: {_short_error(e)}")
         return
 
     # 6. Topics
@@ -101,7 +105,7 @@ async def cmd_reload(message: Message, session):
         )
     except Exception as e:
         logger.exception("Failed to reload topics")
-        await message.answer(f"\u274c Ошибка загрузки тем: {e}")
+        await message.answer(f"\u274c Ошибка загрузки тем: {_short_error(e)}")
         return
 
     # 7. Lessons
@@ -117,7 +121,7 @@ async def cmd_reload(message: Message, session):
             await message.answer(f"Строки с ошибками: {lessons_result['error_rows'][:20]}")
     except Exception as e:
         logger.exception("Failed to reload lessons")
-        await message.answer(f"\u274c Ошибка загрузки уроков: {str(e)[:200]}")
+        await message.answer(f"\u274c Ошибка загрузки уроков: {_short_error(e)}")
         return
 
     # 8. Lesson links
@@ -128,7 +132,7 @@ async def cmd_reload(message: Message, session):
         )
     except Exception as e:
         logger.exception("Failed to reload lesson links")
-        await message.answer(f"\u274c Ошибка загрузки ссылок: {e}")
+        await message.answer(f"\u274c Ошибка загрузки ссылок: {_short_error(e)}")
         return
 
     await message.answer("\u2705 Загрузка данных завершена!")

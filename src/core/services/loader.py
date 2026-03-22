@@ -262,6 +262,10 @@ async def reload_courses_data(session: AsyncSession, rows: list[dict]) -> dict:
             "status_msh": _str(row, "Статус МШ") or None,
         })
 
+    # Deduplicate by id (last wins)
+    deduped = {v["id"]: v for v in values}
+    values = list(deduped.values())
+
     update_fields = [
         "name", "description", "actual", "demo_link", "methodology_link",
         "standard", "skills", "deleted", "status_msh",
@@ -304,6 +308,10 @@ async def reload_sections_data(session: AsyncSession, rows: list[dict]) -> dict:
             "status_msh": _str(row, "Статус МШ") or None,
         })
 
+    # Deduplicate by id (last wins) — required for ON CONFLICT DO UPDATE
+    deduped = {v["id"]: v for v in values}
+    values = list(deduped.values())
+
     update_fields = [
         "course_id", "name", "description", "actual", "demo_link",
         "methodology_link", "standard", "skills", "deleted", "status_msh",
@@ -318,7 +326,7 @@ async def reload_sections_data(session: AsyncSession, rows: list[dict]) -> dict:
         await session.execute(stmt)
 
     await session.commit()
-    logger.info("Sections: %d loaded, %d skipped", len(values), skipped)
+    logger.info("Sections: %d loaded, %d skipped, %d deduped", len(values), skipped, len(deduped) - len(values) if len(deduped) != len(values) else 0)
     return {"sections": len(values)}
 
 
@@ -343,6 +351,10 @@ async def reload_topics_data(session: AsyncSession, rows: list[dict]) -> dict:
             "deleted": _bool_field(row, "Удалено"),
             "status_msh": _str(row, "Статус МШ") or None,
         })
+
+    # Deduplicate by id (last wins)
+    deduped = {v["id"]: v for v in values}
+    values = list(deduped.values())
 
     update_fields = [
         "section_id", "name", "description", "actual", "demo_link",
