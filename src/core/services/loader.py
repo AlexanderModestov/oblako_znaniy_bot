@@ -106,7 +106,7 @@ def fetch_subjects_from_sheets() -> list[dict]:
     settings = get_settings()
     client = _get_gspread_client()
     spreadsheet = client.open_by_key(settings.google_sheets_lessons_id)
-    return spreadsheet.worksheet("subject").get_all_records()
+    return spreadsheet.worksheet("subjects").get_all_records()
 
 
 def fetch_courses_from_sheets() -> list[dict]:
