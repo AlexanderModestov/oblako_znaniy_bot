@@ -118,7 +118,7 @@ COURSE_HEADERS = ["ИД курса", "Наименование", "Описани
 SECTION_HEADERS = ["ИД раздела", "ИД курса", "Наименование", "Описание", "Актуальность", "Ссылка на демо", "Ссылка на методичку", "Стандарты", "Навыки", "Удалено", "Статус МШ"]
 TOPIC_HEADERS = ["ИД темы", "ИД раздела", "Наименование", "Описание", "Актуальность", "Ссылка на демо", "Ссылка на методичку", "Навыки", "Удалено", "Статус МШ"]
 LESSON_HEADERS = ["ИД урока", "Предмет", "Класс", "Курс", "Раздел", "Тема", "Урок", "Ссылка УБ ЦОК", "Описание урока"]
-LINK_HEADERS = ["ИД урока", "URL в УБ ЦОК"]
+LINK_HEADERS = ["ИД урока", "URL  в УБ ЦОК"]
 
 
 def fetch_all_content_from_sheets() -> dict[str, list[dict]]:
@@ -147,7 +147,7 @@ async def generate_embeddings(texts: list[str]) -> list[list[float]]:
     settings = get_settings()
     client = AsyncOpenAI(api_key=settings.openai_api_key)
     embeddings = []
-    batch_size = 2048
+    batch_size = 500
     for i in range(0, len(texts), batch_size):
         batch = texts[i : i + batch_size]
         response = await client.embeddings.create(
@@ -450,7 +450,7 @@ async def reload_lesson_links_data(session: AsyncSession, rows: list[dict]) -> d
         lesson_id = _int_or_none(row, "ИД урока")
         if not lesson_id:
             continue
-        url = _str(row, "URL в УБ ЦОК")
+        url = _str(row, "URL  в УБ ЦОК")
         if not url:
             continue
         link_values.append({"lesson_id": lesson_id, "url": url})

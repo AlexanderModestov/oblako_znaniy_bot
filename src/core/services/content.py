@@ -64,8 +64,8 @@ class ContentService:
 
         offset = (page - 1) * per_page
         query = (
-            select(Lesson).join(Subject)
-            .options(joinedload(Lesson.section), joinedload(Lesson.topic))
+            select(Lesson)
+            .options(joinedload(Lesson.subject), joinedload(Lesson.section), joinedload(Lesson.topic))
             .where(*base_where)
             .order_by(Lesson.title)
             .offset(offset)
