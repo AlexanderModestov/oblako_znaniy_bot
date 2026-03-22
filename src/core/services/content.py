@@ -1,7 +1,8 @@
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
-from src.core.models import Lesson, Subject
+from src.core.models import Lesson, Section, Subject, Topic
 from src.core.schemas import FilterState, LessonResult
 
 
@@ -18,23 +19,33 @@ class ContentService:
         )
         return list(result.scalars().all())
 
-    async def get_sections(self, session: AsyncSession, subject_id: int, grade: int) -> list[str]:
+    async def get_sections(self, session: AsyncSession, subject_id: int, grade: int) -> list[dict]:
         result = await session.execute(
-            select(distinct(Lesson.section))
+            select(distinct(Lesson.section_id))
             .where(Lesson.subject_id == subject_id, Lesson.grade == grade)
-            .where(Lesson.section.is_not(None))
-            .order_by(Lesson.section)
+            .where(Lesson.section_id.is_not(None))
         )
-        return list(result.scalars().all())
+        section_ids = list(result.scalars().all())
+        if not section_ids:
+            return []
+        sections_result = await session.execute(
+            select(Section).where(Section.id.in_(section_ids)).order_by(Section.name)
+        )
+        return [{"id": s.id, "name": s.name} for s in sections_result.scalars().all()]
 
-    async def get_topics(self, session: AsyncSession, subject_id: int, grade: int, section: str) -> list[str]:
+    async def get_topics(self, session: AsyncSession, subject_id: int, grade: int, section_id: int) -> list[dict]:
         result = await session.execute(
-            select(distinct(Lesson.topic))
-            .where(Lesson.subject_id == subject_id, Lesson.grade == grade, Lesson.section == section)
-            .where(Lesson.topic.is_not(None))
-            .order_by(Lesson.topic)
+            select(distinct(Lesson.topic_id))
+            .where(Lesson.subject_id == subject_id, Lesson.grade == grade, Lesson.section_id == section_id)
+            .where(Lesson.topic_id.is_not(None))
         )
-        return list(result.scalars().all())
+        topic_ids = list(result.scalars().all())
+        if not topic_ids:
+            return []
+        topics_result = await session.execute(
+            select(Topic).where(Topic.id.in_(topic_ids)).order_by(Topic.name)
+        )
+        return [{"id": t.id, "name": t.name} for t in topics_result.scalars().all()]
 
     async def get_lessons(self, session: AsyncSession, filters: FilterState, page: int = 1, per_page: int = 5) -> tuple[list[LessonResult], int]:
         base_where = []
@@ -42,10 +53,10 @@ class ContentService:
             base_where.append(Lesson.subject_id == filters.subject_id)
         if filters.grade:
             base_where.append(Lesson.grade == filters.grade)
-        if filters.section:
-            base_where.append(Lesson.section == filters.section)
-        if filters.topic:
-            base_where.append(Lesson.topic == filters.topic)
+        if filters.section_id:
+            base_where.append(Lesson.section_id == filters.section_id)
+        if filters.topic_id:
+            base_where.append(Lesson.topic_id == filters.topic_id)
 
         count_query = select(func.count(Lesson.id)).where(*base_where)
         count_result = await session.execute(count_query)
@@ -54,6 +65,7 @@ class ContentService:
         offset = (page - 1) * per_page
         query = (
             select(Lesson).join(Subject)
+            .options(joinedload(Lesson.section), joinedload(Lesson.topic))
             .where(*base_where)
             .order_by(Lesson.title)
             .offset(offset)
@@ -64,12 +76,12 @@ class ContentService:
         lessons = [
             LessonResult(
                 title=l.title,
-                lesson_type=l.lesson_type,
                 url=l.url,
+                description=l.description,
                 subject=l.subject.name,
-                section=l.section,
-                topic=l.topic,
+                section=l.section.name if l.section else None,
+                topic=l.topic.name if l.topic else None,
             )
-            for l in result.scalars().all()
+            for l in result.scalars().unique().all()
         ]
         return lessons, total

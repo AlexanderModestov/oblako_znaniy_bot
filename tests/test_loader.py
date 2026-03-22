@@ -1,131 +1,44 @@
-from src.core.services.loader import (
-    parse_lessons_rows,
-    parse_regions_schools_rows,
-    validate_lesson_row,
-)
+from src.core.services.loader import _bool_field, _int_or_none, _str
 
 
-def test_validate_lesson_row_valid():
-    row = {
-        "Предмет": "Физика",
-        "Класс": "11",
-        "Курс": "Облако знаний. Подготовка к ЕГЭ. Физика, 11 класс",
-        "Раздел": "Вступительное тестирование",
-        "Тема": "Вступительное тестирование",
-        "Урок": "КИМ ЕГЭ по физике. Тренировочный вариант 1",
-        "Ссылка УБ ЦОК": "https://www.gosuslugi.ru/edu-content/lesson/2873",
-    }
-    result = validate_lesson_row(row, row_num=2)
-    assert result is not None
-    assert result["subject"] == "Физика"
-    assert result["grade"] == 11
-    assert result["url"] == "https://www.gosuslugi.ru/edu-content/lesson/2873"
+def test_str_basic():
+    assert _str({"key": "  hello  "}, "key") == "hello"
 
 
-def test_validate_lesson_row_missing_url():
-    row = {
-        "Предмет": "Математика",
-        "Класс": "5",
-        "Раздел": "",
-        "Тема": "",
-        "Урок": "Тест",
-        "Курс": "Теория",
-        "Ссылка УБ ЦОК": "",
-    }
-    result = validate_lesson_row(row, row_num=2)
-    assert result is None
+def test_str_missing_key():
+    assert _str({}, "key") == ""
 
 
-def test_validate_lesson_row_missing_subject():
-    row = {
-        "Предмет": "",
-        "Класс": "5",
-        "Раздел": "",
-        "Тема": "",
-        "Урок": "Тест",
-        "Курс": "Теория",
-        "Ссылка УБ ЦОК": "https://gosuslugi.ru/123",
-    }
-    result = validate_lesson_row(row, row_num=2)
-    assert result is None
+def test_str_non_string_value():
+    assert _str({"key": 123}, "key") == "123"
 
 
-def test_validate_lesson_row_invalid_grade():
-    row = {
-        "Предмет": "Математика",
-        "Класс": "abc",
-        "Раздел": "",
-        "Тема": "",
-        "Урок": "Тест",
-        "Курс": "Теория",
-        "Ссылка УБ ЦОК": "https://gosuslugi.ru/123",
-    }
-    result = validate_lesson_row(row, row_num=2)
-    assert result is None
+def test_int_or_none_valid():
+    assert _int_or_none({"key": "42"}, "key") == 42
 
 
-def test_validate_lesson_row_empty_optional_fields():
-    row = {
-        "Предмет": "Биология",
-        "Класс": "9",
-        "Раздел": "",
-        "Тема": "",
-        "Урок": "Фотосинтез",
-        "Курс": "",
-        "Ссылка УБ ЦОК": "https://gosuslugi.ru/456",
-    }
-    result = validate_lesson_row(row, row_num=3)
-    assert result is not None
-    assert result["section"] is None
-    assert result["topic"] is None
-    assert result["lesson_type"] is None
+def test_int_or_none_empty():
+    assert _int_or_none({"key": ""}, "key") is None
 
 
-def test_parse_lessons_rows():
-    rows = [
-        {
-            "Предмет": "Физика",
-            "Класс": "11",
-            "Раздел": "Механика",
-            "Тема": "Кинематика",
-            "Урок": "Равномерное движение",
-            "Курс": "Базовый курс",
-            "Ссылка УБ ЦОК": "https://gosuslugi.ru/1",
-        },
-        {
-            "Предмет": "",
-            "Класс": "",
-            "Раздел": "",
-            "Тема": "",
-            "Урок": "",
-            "Курс": "",
-            "Ссылка УБ ЦОК": "",
-        },
-    ]
-    lessons, errors = parse_lessons_rows(rows)
-    assert len(lessons) == 1
-    assert len(errors) == 1
+def test_int_or_none_invalid():
+    assert _int_or_none({"key": "abc"}, "key") is None
 
 
-def test_parse_regions_schools_rows():
-    rows = [
-        {"Регион": "Москва", "Наименование муниципалитета": "ЦАО", "Школа": "Школа №1"},
-        {"Регион": "Москва", "Наименование муниципалитета": "ЦАО", "Школа": "Школа №2"},
-        {"Регион": "Санкт-Петербург", "Наименование муниципалитета": "Центр", "Школа": "Гимназия №1"},
-    ]
-    regions, municipalities, schools = parse_regions_schools_rows(rows)
-    assert len(regions) == 2
-    assert "Москва" in regions
-    assert len(schools) == 3
-    assert len(municipalities) == 2
+def test_int_or_none_missing():
+    assert _int_or_none({}, "key") is None
 
 
-def test_parse_regions_schools_rows_empty_values():
-    rows = [
-        {"Регион": "Москва", "Наименование муниципалитета": "ЦАО", "Школа": "Школа №1"},
-        {"Регион": "", "Наименование муниципалитета": "", "Школа": "Школа №2"},
-        {"Регион": "Москва", "Наименование муниципалитета": "ЦАО", "Школа": ""},
-    ]
-    regions, municipalities, schools = parse_regions_schools_rows(rows)
-    assert len(regions) == 1
-    assert len(schools) == 1
+def test_bool_field_true_values():
+    assert _bool_field({"k": "1"}, "k") is True
+    assert _bool_field({"k": "true"}, "k") is True
+    assert _bool_field({"k": "True"}, "k") is True
+    assert _bool_field({"k": "да"}, "k") is True
+    assert _bool_field({"k": "yes"}, "k") is True
+
+
+def test_bool_field_false_values():
+    assert _bool_field({"k": "0"}, "k") is False
+    assert _bool_field({"k": ""}, "k") is False
+    assert _bool_field({"k": "нет"}, "k") is False
+    assert _bool_field({}, "k") is False

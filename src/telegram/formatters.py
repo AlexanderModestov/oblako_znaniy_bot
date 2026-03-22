@@ -4,7 +4,6 @@ from src.core.schemas import LessonResult, SearchResult
 def format_lesson_param(lesson: LessonResult) -> str:
     return (
         f"\U0001f4da {lesson.title}\n"
-        f"Вид: {lesson.lesson_type}\n"
         f"\u2192 {lesson.url}"
     )
 
@@ -16,7 +15,6 @@ def format_lesson_text(lesson: LessonResult, index: int) -> str:
     return (
         f"{index}. {semantic_mark}{context}\n"
         f"   \U0001f4da {lesson.title}\n"
-        f"   Вид: {lesson.lesson_type}\n"
         f"   \u2192 {lesson.url}"
     )
 

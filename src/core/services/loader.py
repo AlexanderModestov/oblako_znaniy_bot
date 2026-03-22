@@ -194,11 +194,12 @@ async def reload_schools_data(session: AsyncSession) -> dict:
         await session.execute(stmt)
     await session.flush()
 
-    # Build municipality map
-    result = await session.execute(select(Municipality).join(Region))
+    # Build municipality map using (region_id, name) as key
+    result = await session.execute(select(Municipality))
+    region_id_to_name = {rid: rn for rn, rid in region_map.items()}
     muni_map = {}
     for m in result.scalars().all():
-        region_name = next((rn for rn, rid in region_map.items() if rid == m.region_id), None)
+        region_name = region_id_to_name.get(m.region_id)
         if region_name:
             muni_map[(region_name, m.name)] = m.id
 
@@ -226,37 +227,38 @@ async def reload_schools_data(session: AsyncSession) -> dict:
 async def reload_subjects_data(session: AsyncSession) -> dict:
     """Parse 'subject' tab with columns: Name, Code. Upsert on name, update code."""
     rows = fetch_subjects_from_sheets()
-    count = 0
-
+    values = []
     for row in rows:
         name = _str(row, "Name")
-        code = _str(row, "Code") or None
         if not name:
             continue
-        stmt = pg_insert(Subject).values(name=name, code=code)
+        values.append({"name": name, "code": _str(row, "Code") or None})
+
+    for i in range(0, len(values), BATCH_SIZE):
+        batch = values[i : i + BATCH_SIZE]
+        stmt = pg_insert(Subject).values(batch)
         stmt = stmt.on_conflict_do_update(
             index_elements=["name"],
             set_={"code": stmt.excluded.code},
         )
         await session.execute(stmt)
-        count += 1
 
     await session.commit()
-    return {"subjects": count}
+    return {"subjects": len(values)}
 
 
 async def reload_courses_data(session: AsyncSession) -> dict:
     """Parse 'Курс' tab. Upsert on id."""
     rows = fetch_courses_from_sheets()
-    count = 0
-
+    values = []
     for row in rows:
         course_id = _int_or_none(row, "ИД курса")
-        if course_id is None:
+        name = _str(row, "Наименование")
+        if course_id is None or not name:
             continue
-        values = {
+        values.append({
             "id": course_id,
-            "name": _str(row, "Наименование"),
+            "name": name,
             "description": _str(row, "Описание") or None,
             "actual": _bool_field(row, "Актуальность"),
             "demo_link": _str(row, "Ссылка на демо") or None,
@@ -265,32 +267,39 @@ async def reload_courses_data(session: AsyncSession) -> dict:
             "skills": _str(row, "Навыки") or None,
             "deleted": _bool_field(row, "Удалено"),
             "status_msh": _str(row, "Статус МШ") or None,
-        }
-        stmt = pg_insert(Course).values(**values)
+        })
+
+    update_fields = [
+        "name", "description", "actual", "demo_link", "methodology_link",
+        "standard", "skills", "deleted", "status_msh",
+    ]
+    for i in range(0, len(values), BATCH_SIZE):
+        batch = values[i : i + BATCH_SIZE]
+        stmt = pg_insert(Course).values(batch)
         stmt = stmt.on_conflict_do_update(
             index_elements=["id"],
-            set_={k: stmt.excluded[k] for k in values if k != "id"},
+            set_={k: stmt.excluded[k] for k in update_fields},
         )
         await session.execute(stmt)
-        count += 1
 
     await session.commit()
-    return {"courses": count}
+    return {"courses": len(values)}
 
 
 async def reload_sections_data(session: AsyncSession) -> dict:
     """Parse 'Разделы' tab. Upsert on id."""
     rows = fetch_sections_from_sheets()
-    count = 0
-
+    values = []
     for row in rows:
         section_id = _int_or_none(row, "ИД раздела")
-        if section_id is None:
+        course_id = _int_or_none(row, "ИД курса")
+        name = _str(row, "Наименование")
+        if section_id is None or course_id is None or not name:
             continue
-        values = {
+        values.append({
             "id": section_id,
-            "course_id": _int_or_none(row, "ИД курса"),
-            "name": _str(row, "Наименование"),
+            "course_id": course_id,
+            "name": name,
             "description": _str(row, "Описание") or None,
             "actual": _bool_field(row, "Актуальность"),
             "demo_link": _str(row, "Ссылка на демо") or None,
@@ -299,32 +308,39 @@ async def reload_sections_data(session: AsyncSession) -> dict:
             "skills": _str(row, "Навыки") or None,
             "deleted": _bool_field(row, "Удалено"),
             "status_msh": _str(row, "Статус МШ") or None,
-        }
-        stmt = pg_insert(Section).values(**values)
+        })
+
+    update_fields = [
+        "course_id", "name", "description", "actual", "demo_link",
+        "methodology_link", "standard", "skills", "deleted", "status_msh",
+    ]
+    for i in range(0, len(values), BATCH_SIZE):
+        batch = values[i : i + BATCH_SIZE]
+        stmt = pg_insert(Section).values(batch)
         stmt = stmt.on_conflict_do_update(
             index_elements=["id"],
-            set_={k: stmt.excluded[k] for k in values if k != "id"},
+            set_={k: stmt.excluded[k] for k in update_fields},
         )
         await session.execute(stmt)
-        count += 1
 
     await session.commit()
-    return {"sections": count}
+    return {"sections": len(values)}
 
 
 async def reload_topics_data(session: AsyncSession) -> dict:
     """Parse 'Темы' tab. Upsert on id. NOTE: No 'Стандарты' column."""
     rows = fetch_topics_from_sheets()
-    count = 0
-
+    values = []
     for row in rows:
         topic_id = _int_or_none(row, "ИД темы")
-        if topic_id is None:
+        section_id = _int_or_none(row, "ИД раздела")
+        name = _str(row, "Наименование")
+        if topic_id is None or section_id is None or not name:
             continue
-        values = {
+        values.append({
             "id": topic_id,
-            "section_id": _int_or_none(row, "ИД раздела"),
-            "name": _str(row, "Наименование"),
+            "section_id": section_id,
+            "name": name,
             "description": _str(row, "Описание") or None,
             "actual": _bool_field(row, "Актуальность"),
             "demo_link": _str(row, "Ссылка на демо") or None,
@@ -332,17 +348,23 @@ async def reload_topics_data(session: AsyncSession) -> dict:
             "skills": _str(row, "Навыки") or None,
             "deleted": _bool_field(row, "Удалено"),
             "status_msh": _str(row, "Статус МШ") or None,
-        }
-        stmt = pg_insert(Topic).values(**values)
+        })
+
+    update_fields = [
+        "section_id", "name", "description", "actual", "demo_link",
+        "methodology_link", "skills", "deleted", "status_msh",
+    ]
+    for i in range(0, len(values), BATCH_SIZE):
+        batch = values[i : i + BATCH_SIZE]
+        stmt = pg_insert(Topic).values(batch)
         stmt = stmt.on_conflict_do_update(
             index_elements=["id"],
-            set_={k: stmt.excluded[k] for k in values if k != "id"},
+            set_={k: stmt.excluded[k] for k in update_fields},
         )
         await session.execute(stmt)
-        count += 1
 
     await session.commit()
-    return {"topics": count}
+    return {"topics": len(values)}
 
 
 async def reload_lessons_data(session: AsyncSession) -> dict:
@@ -364,7 +386,7 @@ async def reload_lessons_data(session: AsyncSession) -> dict:
         title = _str(row, "Урок")
         url = _str(row, "Ссылка УБ ЦОК")
 
-        if not lesson_id or not subject_name or grade is None or not title:
+        if not lesson_id or not subject_name or grade is None or not title or not url:
             logger.warning("Row %d: missing required field(s)", i)
             errors.append(i)
             continue
@@ -380,7 +402,7 @@ async def reload_lessons_data(session: AsyncSession) -> dict:
             "subject_id": subject_id,
             "grade": grade,
             "title": title,
-            "url": url or "",
+            "url": url,
             "description": _str(row, "Описание урока") or None,
             "course_id": _int_or_none(row, "Курс"),
             "section_id": _int_or_none(row, "Раздел"),
