@@ -6,6 +6,8 @@ from aiogram.types import Message
 
 from src.config import get_settings
 from src.core.services.loader import (
+    fetch_all_content_from_sheets,
+    fetch_schools_from_sheets,
     reload_courses_data,
     reload_lesson_links_data,
     reload_lessons_data,
@@ -34,7 +36,7 @@ async def cmd_reload(message: Message, session):
 
     await message.answer("\u23f3 Загрузка данных...")
 
-    # 1. Schools (regions → schools)
+    # 1. Schools (fetch + load)
     try:
         schools_result = await reload_schools_data(session)
         await message.answer(
@@ -46,9 +48,18 @@ async def cmd_reload(message: Message, session):
         await message.answer(f"\u274c Ошибка загрузки школ: {e}")
         return
 
-    # 2. Subjects
+    # 2. Fetch all content tabs at once (1 API call for spreadsheet)
     try:
-        subjects_result = await reload_subjects_data(session)
+        await message.answer("\u23f3 Загрузка контента из Google Sheets...")
+        content = fetch_all_content_from_sheets()
+    except Exception as e:
+        logger.exception("Failed to fetch content from sheets")
+        await message.answer(f"\u274c Ошибка загрузки из Google Sheets: {e}")
+        return
+
+    # 3. Subjects
+    try:
+        subjects_result = await reload_subjects_data(session, content["subjects"])
         await message.answer(
             f"\u2705 Предметы: {subjects_result['subjects']} загружено"
         )
@@ -57,9 +68,9 @@ async def cmd_reload(message: Message, session):
         await message.answer(f"\u274c Ошибка загрузки предметов: {e}")
         return
 
-    # 3. Courses
+    # 4. Courses
     try:
-        courses_result = await reload_courses_data(session)
+        courses_result = await reload_courses_data(session, content["courses"])
         await message.answer(
             f"\u2705 Курсы: {courses_result['courses']} загружено"
         )
@@ -68,9 +79,9 @@ async def cmd_reload(message: Message, session):
         await message.answer(f"\u274c Ошибка загрузки курсов: {e}")
         return
 
-    # 4. Sections
+    # 5. Sections
     try:
-        sections_result = await reload_sections_data(session)
+        sections_result = await reload_sections_data(session, content["sections"])
         await message.answer(
             f"\u2705 Разделы: {sections_result['sections']} загружено"
         )
@@ -79,9 +90,9 @@ async def cmd_reload(message: Message, session):
         await message.answer(f"\u274c Ошибка загрузки разделов: {e}")
         return
 
-    # 5. Topics
+    # 6. Topics
     try:
-        topics_result = await reload_topics_data(session)
+        topics_result = await reload_topics_data(session, content["topics"])
         await message.answer(
             f"\u2705 Темы: {topics_result['topics']} загружено"
         )
@@ -90,9 +101,9 @@ async def cmd_reload(message: Message, session):
         await message.answer(f"\u274c Ошибка загрузки тем: {e}")
         return
 
-    # 6. Lessons
+    # 7. Lessons
     try:
-        lessons_result = await reload_lessons_data(session)
+        lessons_result = await reload_lessons_data(session, content["lessons"])
         emb_status = "\u2705" if lessons_result["embeddings"] else "\u26a0\ufe0f без эмбеддингов"
         await message.answer(
             f"\u2705 Уроки: {lessons_result['loaded']} загружено, "
@@ -106,9 +117,9 @@ async def cmd_reload(message: Message, session):
         await message.answer(f"\u274c Ошибка загрузки уроков: {e}")
         return
 
-    # 7. Lesson links
+    # 8. Lesson links
     try:
-        links_result = await reload_lesson_links_data(session)
+        links_result = await reload_lesson_links_data(session, content["links"])
         await message.answer(
             f"\u2705 Ссылки: {links_result['links']} загружено"
         )

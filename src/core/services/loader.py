@@ -107,46 +107,19 @@ def fetch_schools_from_sheets() -> list[dict]:
     return all_rows
 
 
-def fetch_subjects_from_sheets() -> list[dict]:
+def fetch_all_content_from_sheets() -> dict[str, list[dict]]:
+    """Open lessons spreadsheet once, read all tabs, return dict of tab_name -> rows."""
     settings = get_settings()
     client = _get_gspread_client()
     spreadsheet = client.open_by_key(settings.google_sheets_lessons_id)
-    return spreadsheet.worksheet("subjects").get_all_records()
-
-
-def fetch_courses_from_sheets() -> list[dict]:
-    settings = get_settings()
-    client = _get_gspread_client()
-    spreadsheet = client.open_by_key(settings.google_sheets_lessons_id)
-    return spreadsheet.worksheet("Курс").get_all_records()
-
-
-def fetch_sections_from_sheets() -> list[dict]:
-    settings = get_settings()
-    client = _get_gspread_client()
-    spreadsheet = client.open_by_key(settings.google_sheets_lessons_id)
-    return spreadsheet.worksheet("Разделы").get_all_records()
-
-
-def fetch_topics_from_sheets() -> list[dict]:
-    settings = get_settings()
-    client = _get_gspread_client()
-    spreadsheet = client.open_by_key(settings.google_sheets_lessons_id)
-    return spreadsheet.worksheet("Темы").get_all_records()
-
-
-def fetch_lessons_from_sheets() -> list[dict]:
-    settings = get_settings()
-    client = _get_gspread_client()
-    spreadsheet = client.open_by_key(settings.google_sheets_lessons_id)
-    return spreadsheet.worksheet("Уроки").get_all_records()
-
-
-def fetch_lesson_links_from_sheets() -> list[dict]:
-    settings = get_settings()
-    client = _get_gspread_client()
-    spreadsheet = client.open_by_key(settings.google_sheets_lessons_id)
-    return spreadsheet.worksheet("Ссылки").get_all_records()
+    return {
+        "subjects": spreadsheet.worksheet("subjects").get_all_records(),
+        "courses": spreadsheet.worksheet("Курс").get_all_records(),
+        "sections": spreadsheet.worksheet("Разделы").get_all_records(),
+        "topics": spreadsheet.worksheet("Темы").get_all_records(),
+        "lessons": spreadsheet.worksheet("Уроки").get_all_records(),
+        "links": spreadsheet.worksheet("Ссылки").get_all_records(),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -229,9 +202,8 @@ async def reload_schools_data(session: AsyncSession) -> dict:
     }
 
 
-async def reload_subjects_data(session: AsyncSession) -> dict:
-    """Parse 'subject' tab with columns: Name, Code. Upsert on name, update code."""
-    rows = fetch_subjects_from_sheets()
+async def reload_subjects_data(session: AsyncSession, rows: list[dict]) -> dict:
+    """Parse 'subjects' tab with columns: Name, Code. Upsert on name, update code."""
     values = []
     for row in rows:
         name = _str(row, "Name")
@@ -252,9 +224,8 @@ async def reload_subjects_data(session: AsyncSession) -> dict:
     return {"subjects": len(values)}
 
 
-async def reload_courses_data(session: AsyncSession) -> dict:
+async def reload_courses_data(session: AsyncSession, rows: list[dict]) -> dict:
     """Parse 'Курс' tab. Upsert on id."""
-    rows = fetch_courses_from_sheets()
     values = []
     for row in rows:
         course_id = _int_or_none(row, "ИД курса")
@@ -291,9 +262,8 @@ async def reload_courses_data(session: AsyncSession) -> dict:
     return {"courses": len(values)}
 
 
-async def reload_sections_data(session: AsyncSession) -> dict:
+async def reload_sections_data(session: AsyncSession, rows: list[dict]) -> dict:
     """Parse 'Разделы' tab. Upsert on id."""
-    rows = fetch_sections_from_sheets()
     values = []
     for row in rows:
         section_id = _int_or_none(row, "ИД раздела")
@@ -332,9 +302,8 @@ async def reload_sections_data(session: AsyncSession) -> dict:
     return {"sections": len(values)}
 
 
-async def reload_topics_data(session: AsyncSession) -> dict:
+async def reload_topics_data(session: AsyncSession, rows: list[dict]) -> dict:
     """Parse 'Темы' tab. Upsert on id. NOTE: No 'Стандарты' column."""
-    rows = fetch_topics_from_sheets()
     values = []
     for row in rows:
         topic_id = _int_or_none(row, "ИД темы")
@@ -372,10 +341,9 @@ async def reload_topics_data(session: AsyncSession) -> dict:
     return {"topics": len(values)}
 
 
-async def reload_lessons_data(session: AsyncSession) -> dict:
+async def reload_lessons_data(session: AsyncSession, rows: list[dict]) -> dict:
     """Parse 'Уроки' tab. Full reload: delete all LessonLinks, delete all Lessons, batch insert."""
-    logger.info("Fetching lessons from Google Sheets...")
-    rows = fetch_lessons_from_sheets()
+    logger.info("Processing %d lesson rows...", len(rows))
 
     # Build subject map
     result = await session.execute(select(Subject))
@@ -455,9 +423,8 @@ async def reload_lessons_data(session: AsyncSession) -> dict:
     }
 
 
-async def reload_lesson_links_data(session: AsyncSession) -> dict:
+async def reload_lesson_links_data(session: AsyncSession, rows: list[dict]) -> dict:
     """Parse 'Ссылки' tab. Full reload: delete all LessonLinks, batch insert."""
-    rows = fetch_lesson_links_from_sheets()
 
     await session.execute(delete(LessonLink))
 
