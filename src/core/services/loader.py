@@ -70,7 +70,24 @@ def _get_gspread_client() -> gspread.Client:
 # Fetch functions (read from Google Sheets)
 # ---------------------------------------------------------------------------
 
-EXPECTED_SCHOOL_HEADERS = ["Регион", "municipality", "Наименование муниципалитета", "Школа"]
+SCHOOL_HEADERS = ["Регион", "municipality", "Наименование муниципалитета", "Школа"]
+
+
+def _parse_sheet_with_headers(ws, headers: list[str]) -> list[dict]:
+    """Read raw values and build dicts using provided headers, ignoring duplicate header issues."""
+    all_values = ws.get_all_values()
+    if not all_values:
+        return []
+    # Skip header row (first row), use our known headers
+    rows = []
+    for row_values in all_values[1:]:
+        if not any(v.strip() for v in row_values):
+            continue  # skip empty rows
+        row = {}
+        for i, header in enumerate(headers):
+            row[header] = row_values[i] if i < len(row_values) else ""
+        rows.append(row)
+    return rows
 
 
 def fetch_schools_from_sheets() -> list[dict]:
@@ -81,7 +98,7 @@ def fetch_schools_from_sheets() -> list[dict]:
     worksheets = spreadsheet.worksheets()
     all_rows: list[dict] = []
     for ws in worksheets[1:]:  # skip first worksheet
-        all_rows.extend(ws.get_all_records(expected_headers=EXPECTED_SCHOOL_HEADERS))
+        all_rows.extend(_parse_sheet_with_headers(ws, SCHOOL_HEADERS))
     return all_rows
 
 
