@@ -74,18 +74,24 @@ SCHOOL_HEADERS = ["Регион", "municipality", "Наименование му
 
 
 def _parse_sheet_with_headers(ws, headers: list[str]) -> list[dict]:
-    """Read raw values and build dicts using provided headers, ignoring duplicate header issues."""
+    """Read raw values and map columns by matching actual headers to expected ones."""
     all_values = ws.get_all_values()
     if not all_values:
         return []
-    # Skip header row (first row), use our known headers
+    # Read actual headers from first row and find column indices
+    actual_headers = [h.strip() for h in all_values[0]]
+    col_map = {}  # header_name -> column_index
+    for header in headers:
+        if header in actual_headers:
+            col_map[header] = actual_headers.index(header)
     rows = []
     for row_values in all_values[1:]:
         if not any(v.strip() for v in row_values):
             continue  # skip empty rows
         row = {}
-        for i, header in enumerate(headers):
-            row[header] = row_values[i] if i < len(row_values) else ""
+        for header in headers:
+            idx = col_map.get(header)
+            row[header] = row_values[idx].strip() if idx is not None and idx < len(row_values) else ""
         rows.append(row)
     return rows
 
