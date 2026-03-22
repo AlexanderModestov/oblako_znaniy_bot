@@ -83,6 +83,12 @@ def _parse_sheet_with_headers(ws, headers: list[str]) -> list[dict]:
     for header in headers:
         if header in actual_headers:
             col_map[header] = actual_headers.index(header)
+    unmapped = [h for h in headers if h not in col_map]
+    if unmapped:
+        logger.warning(
+            "Sheet '%s': unmapped headers %s. Actual headers: %s",
+            ws.title, unmapped, actual_headers[:15],
+        )
     rows = []
     for row_values in all_values[1:]:
         if not any(v.strip() for v in row_values):
@@ -120,7 +126,7 @@ def fetch_all_content_from_sheets() -> dict[str, list[dict]]:
     settings = get_settings()
     client = _get_gspread_client()
     spreadsheet = client.open_by_key(settings.google_sheets_lessons_id)
-    return {
+    result = {
         "subjects": _parse_sheet_with_headers(spreadsheet.worksheet("subjects"), SUBJECT_HEADERS),
         "courses": _parse_sheet_with_headers(spreadsheet.worksheet("Курсы"), COURSE_HEADERS),
         "sections": _parse_sheet_with_headers(spreadsheet.worksheet("Разделы"), SECTION_HEADERS),
@@ -128,6 +134,9 @@ def fetch_all_content_from_sheets() -> dict[str, list[dict]]:
         "lessons": _parse_sheet_with_headers(spreadsheet.worksheet("Уроки"), LESSON_HEADERS),
         "links": _parse_sheet_with_headers(spreadsheet.worksheet("Ссылки"), LINK_HEADERS),
     }
+    for name, rows in result.items():
+        logger.info("Fetched %d rows from '%s'", len(rows), name)
+    return result
 
 
 # ---------------------------------------------------------------------------
