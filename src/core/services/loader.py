@@ -107,18 +107,26 @@ def fetch_schools_from_sheets() -> list[dict]:
     return all_rows
 
 
+SUBJECT_HEADERS = ["Id", "Name", "Code"]
+COURSE_HEADERS = ["ИД курса", "Наименование", "Описание", "Актуальность", "Ссылка на демо", "Ссылка на методичку", "Стандарты", "Навыки", "Удалено", "Статус МШ"]
+SECTION_HEADERS = ["ИД раздела", "ИД курса", "Наименование", "Описание", "Актуальность", "Ссылка на демо", "Ссылка на методичку", "Стандарты", "Навыки", "Удалено", "Статус МШ"]
+TOPIC_HEADERS = ["ИД темы", "ИД раздела", "Наименование", "Описание", "Актуальность", "Ссылка на демо", "Ссылка на методичку", "Навыки", "Удалено", "Статус МШ"]
+LESSON_HEADERS = ["ИД урока", "Предмет", "Класс", "Курс", "Раздел", "Тема", "Урок", "Ссылка УБ ЦОК", "Описание урока"]
+LINK_HEADERS = ["ИД урока", "URL в УБ ЦОК"]
+
+
 def fetch_all_content_from_sheets() -> dict[str, list[dict]]:
     """Open lessons spreadsheet once, read all tabs, return dict of tab_name -> rows."""
     settings = get_settings()
     client = _get_gspread_client()
     spreadsheet = client.open_by_key(settings.google_sheets_lessons_id)
     return {
-        "subjects": spreadsheet.worksheet("subjects").get_all_records(),
-        "courses": spreadsheet.worksheet("Курсы").get_all_records(),
-        "sections": spreadsheet.worksheet("Разделы").get_all_records(),
-        "topics": spreadsheet.worksheet("Темы").get_all_records(),
-        "lessons": spreadsheet.worksheet("Уроки").get_all_records(),
-        "links": spreadsheet.worksheet("Ссылки").get_all_records(),
+        "subjects": _parse_sheet_with_headers(spreadsheet.worksheet("subjects"), SUBJECT_HEADERS),
+        "courses": _parse_sheet_with_headers(spreadsheet.worksheet("Курсы"), COURSE_HEADERS),
+        "sections": _parse_sheet_with_headers(spreadsheet.worksheet("Разделы"), SECTION_HEADERS),
+        "topics": _parse_sheet_with_headers(spreadsheet.worksheet("Темы"), TOPIC_HEADERS),
+        "lessons": _parse_sheet_with_headers(spreadsheet.worksheet("Уроки"), LESSON_HEADERS),
+        "links": _parse_sheet_with_headers(spreadsheet.worksheet("Ссылки"), LINK_HEADERS),
     }
 
 
@@ -428,14 +436,12 @@ async def reload_lesson_links_data(session: AsyncSession, rows: list[dict]) -> d
 
     await session.execute(delete(LessonLink))
 
-    # Handle possible double space in header "URL  в УБ ЦОК"
     link_values = []
     for row in rows:
         lesson_id = _int_or_none(row, "ИД урока")
         if not lesson_id:
             continue
-        # Try both single and double space variants
-        url = _str(row, "URL  в УБ ЦОК") or _str(row, "URL в УБ ЦОК")
+        url = _str(row, "URL в УБ ЦОК")
         if not url:
             continue
         link_values.append({"lesson_id": lesson_id, "url": url})
