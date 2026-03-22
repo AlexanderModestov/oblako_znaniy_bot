@@ -2,7 +2,10 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from src.core.database import Base
-from src.core.models import Region, School, Subject, User, Lesson  # noqa: F401
+from src.core.models import (  # noqa: F401
+    Region, Municipality, School, Subject, Course, Section, Topic,
+    Lesson, LessonLink, User,
+)
 from src.config import get_settings
 
 config = context.config
