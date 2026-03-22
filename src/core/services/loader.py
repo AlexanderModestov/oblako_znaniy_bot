@@ -332,12 +332,21 @@ async def reload_sections_data(session: AsyncSession, rows: list[dict]) -> dict:
 
 async def reload_topics_data(session: AsyncSession, rows: list[dict]) -> dict:
     """Parse 'Темы' tab. Upsert on id. NOTE: No 'Стандарты' column."""
+    # Get existing section IDs to skip orphaned topics
+    result = await session.execute(select(Section.id))
+    existing_section_ids = {row[0] for row in result.all()}
+
     values = []
+    skipped = 0
     for row in rows:
         topic_id = _str(row, "ИД темы")
         section_id = _str(row, "ИД раздела")
         name = _str(row, "Наименование")
         if not topic_id or not section_id or not name:
+            skipped += 1
+            continue
+        if section_id not in existing_section_ids:
+            skipped += 1
             continue
         values.append({
             "id": topic_id,  # string like "t12581437"
@@ -355,6 +364,8 @@ async def reload_topics_data(session: AsyncSession, rows: list[dict]) -> dict:
     # Deduplicate by id (last wins)
     deduped = {v["id"]: v for v in values}
     values = list(deduped.values())
+    if skipped:
+        logger.warning("Topics: skipped %d rows (missing fields or orphaned section_id)", skipped)
 
     update_fields = [
         "section_id", "name", "description", "actual", "demo_link",
