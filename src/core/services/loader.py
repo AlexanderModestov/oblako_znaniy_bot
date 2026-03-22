@@ -114,7 +114,7 @@ def fetch_all_content_from_sheets() -> dict[str, list[dict]]:
     spreadsheet = client.open_by_key(settings.google_sheets_lessons_id)
     return {
         "subjects": spreadsheet.worksheet("subjects").get_all_records(),
-        "courses": spreadsheet.worksheet("Курс").get_all_records(),
+        "courses": spreadsheet.worksheet("Курсы").get_all_records(),
         "sections": spreadsheet.worksheet("Разделы").get_all_records(),
         "topics": spreadsheet.worksheet("Темы").get_all_records(),
         "lessons": spreadsheet.worksheet("Уроки").get_all_records(),
