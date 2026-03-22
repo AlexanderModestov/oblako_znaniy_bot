@@ -3,6 +3,7 @@ from datetime import datetime
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     ForeignKey,
     Index,
     SmallInteger,
@@ -23,18 +24,36 @@ class Region(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
 
-    schools: Mapped[list["School"]] = relationship(back_populates="region")
+    municipalities: Mapped[list["Municipality"]] = relationship(back_populates="region")
 
 
-class School(Base):
-    __tablename__ = "schools"
-    __table_args__ = (UniqueConstraint("region_id", "name", name="uq_schools_region_id_name"),)
+class Municipality(Base):
+    __tablename__ = "municipalities"
+    __table_args__ = (
+        UniqueConstraint("region_id", "name", name="uq_municipalities_region_id_name"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     region_id: Mapped[int] = mapped_column(ForeignKey("regions.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    region: Mapped["Region"] = relationship(back_populates="schools")
+    region: Mapped["Region"] = relationship(back_populates="municipalities")
+    schools: Mapped[list["School"]] = relationship(back_populates="municipality")
+
+
+class School(Base):
+    __tablename__ = "schools"
+    __table_args__ = (
+        UniqueConstraint("municipality_id", "name", name="uq_schools_municipality_id_name"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    municipality_id: Mapped[int] = mapped_column(
+        ForeignKey("municipalities.id"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    municipality: Mapped["Municipality"] = relationship(back_populates="schools")
 
 
 class Subject(Base):
@@ -42,6 +61,7 @@ class Subject(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    code: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
 
 class User(Base):
@@ -62,6 +82,59 @@ class User(Base):
     school: Mapped["School"] = relationship()
 
 
+class Course(Base):
+    __tablename__ = "courses"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actual: Mapped[bool] = mapped_column(Boolean, default=True)
+    demo_link: Mapped[str | None] = mapped_column(Text, nullable=True)
+    methodology_link: Mapped[str | None] = mapped_column(Text, nullable=True)
+    standard: Mapped[str | None] = mapped_column(Text, nullable=True)
+    skills: Mapped[str | None] = mapped_column(Text, nullable=True)
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    status_msh: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    sections: Mapped[list["Section"]] = relationship(back_populates="course")
+
+
+class Section(Base):
+    __tablename__ = "sections"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actual: Mapped[bool] = mapped_column(Boolean, default=True)
+    demo_link: Mapped[str | None] = mapped_column(Text, nullable=True)
+    methodology_link: Mapped[str | None] = mapped_column(Text, nullable=True)
+    standard: Mapped[str | None] = mapped_column(Text, nullable=True)
+    skills: Mapped[str | None] = mapped_column(Text, nullable=True)
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    status_msh: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    course: Mapped["Course"] = relationship(back_populates="sections")
+    topics: Mapped[list["Topic"]] = relationship(back_populates="section")
+
+
+class Topic(Base):
+    __tablename__ = "topics"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    section_id: Mapped[int] = mapped_column(ForeignKey("sections.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actual: Mapped[bool] = mapped_column(Boolean, default=True)
+    demo_link: Mapped[str | None] = mapped_column(Text, nullable=True)
+    methodology_link: Mapped[str | None] = mapped_column(Text, nullable=True)
+    skills: Mapped[str | None] = mapped_column(Text, nullable=True)
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    status_msh: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    section: Mapped["Section"] = relationship(back_populates="topics")
+
+
 class Lesson(Base):
     __tablename__ = "lessons"
     __table_args__ = (
@@ -72,13 +145,36 @@ class Lesson(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     subject_id: Mapped[int] = mapped_column(ForeignKey("subjects.id"), nullable=False)
     grade: Mapped[int] = mapped_column(SmallInteger, nullable=False)
-    section: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    topic: Mapped[str | None] = mapped_column(String(255), nullable=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    lesson_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
     url: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    course_id: Mapped[int | None] = mapped_column(
+        ForeignKey("courses.id"), nullable=True
+    )
+    section_id: Mapped[int | None] = mapped_column(
+        ForeignKey("sections.id"), nullable=True
+    )
+    topic_id: Mapped[int | None] = mapped_column(
+        ForeignKey("topics.id"), nullable=True
+    )
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
     embedding = mapped_column(Vector(1536), nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     subject: Mapped["Subject"] = relationship()
+    course: Mapped["Course | None"] = relationship()
+    section: Mapped["Section | None"] = relationship()
+    topic: Mapped["Topic | None"] = relationship()
+    links: Mapped[list["LessonLink"]] = relationship(back_populates="lesson")
+
+
+class LessonLink(Base):
+    __tablename__ = "lesson_links"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    lesson_id: Mapped[int] = mapped_column(
+        ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False
+    )
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+
+    lesson: Mapped["Lesson"] = relationship(back_populates="links")
