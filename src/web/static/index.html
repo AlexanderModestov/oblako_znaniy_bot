@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Регистрация</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Loading screen -->
+<div id="loading" class="screen">
+    <div class="spinner"></div>
+</div>
+
+<!-- Welcome (already registered) screen -->
+<div id="welcome" class="screen hidden">
+    <div class="welcome-icon">&#128075;</div>
+    <h1 class="welcome-heading">С возвращением, <span id="welcome-name"></span>!</h1>
+</div>
+
+<!-- Success screen -->
+<div id="success" class="screen hidden">
+    <div class="success-checkmark">
+        <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+            <circle cx="40" cy="40" r="38" stroke="var(--tg-theme-button-color, #3390ec)" stroke-width="4"/>
+            <path d="M24 40L35 51L56 29" stroke="var(--tg-theme-button-color, #3390ec)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </div>
+    <h1 class="success-heading">Регистрация завершена!</h1>
+</div>
+
+<!-- Progress bar -->
+<div id="progress-bar" class="hidden">
+    <div class="progress-dots">
+        <div class="dot" data-step="1"></div>
+        <div class="dot" data-step="2"></div>
+        <div class="dot" data-step="3"></div>
+        <div class="dot" data-step="4"></div>
+        <div class="dot" data-step="5"></div>
+        <div class="dot" data-step="6"></div>
+    </div>
+</div>
+
+<!-- Step 1: ФИО -->
+<div id="step-1" class="step">
+    <h2>Введите ваше имя и фамилию</h2>
+    <input type="text" id="input-name" placeholder="Например: Иванов Иван" autocomplete="name">
+    <div id="error-name" class="error-message"></div>
+</div>
+
+<!-- Step 2: Регион -->
+<div id="step-2" class="step">
+    <h2>Выберите ваш регион</h2>
+    <input type="text" id="search-region" class="search-input" placeholder="&#128269; Поиск региона...">
+    <div id="list-region" class="item-list"></div>
+</div>
+
+<!-- Step 3: Школа -->
+<div id="step-3" class="step">
+    <h2>Выберите вашу школу</h2>
+    <input type="text" id="search-school" class="search-input" placeholder="&#128269; Поиск школы...">
+    <div id="list-school" class="item-list"></div>
+</div>
+
+<!-- Step 4: Предметы -->
+<div id="step-4" class="step">
+    <h2>Какие предметы вы ведёте?</h2>
+    <p class="subtitle">Выберите и нажмите «Готово»</p>
+    <div id="list-subjects" class="subjects-grid"></div>
+</div>
+
+<!-- Step 5: Телефон -->
+<div id="step-5" class="step">
+    <h2>Введите номер телефона</h2>
+    <input type="tel" id="input-phone" placeholder="+7 (999) 123-45-67">
+    <div id="error-phone" class="error-message"></div>
+</div>
+
+<!-- Step 6: Email -->
+<div id="step-6" class="step">
+    <h2>Введите email</h2>
+    <input type="email" id="input-email" placeholder="example@mail.ru">
+    <div id="error-email" class="error-message"></div>
+    <button type="button" id="btn-skip" class="skip-button">Пропустить</button>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

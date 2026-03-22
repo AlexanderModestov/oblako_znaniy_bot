@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     google_sheets_schools_id: str
     google_service_account_json: str
     openai_api_key: str
+    web_app_url: str = ""
     fts_min_results: int = 3
     semantic_similarity_threshold: float = 0.75
     results_per_page: int = 5
