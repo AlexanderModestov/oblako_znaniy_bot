@@ -10,6 +10,7 @@ from src.telegram.keyboards import (
     contact_keyboard,
     items_keyboard,
     main_menu_keyboard,
+    paginated_items_keyboard,
     skip_keyboard,
     subjects_toggle_keyboard,
 )
@@ -45,51 +46,58 @@ async def cmd_start(message: Message, state: FSMContext, session):
 
 
 @router.message(OnboardingStates.full_name)
-async def process_name(message: Message, state: FSMContext):
+async def process_name(message: Message, state: FSMContext, session):
     name = message.text.strip()
     if len(name.split()) < 2:
         await message.answer("Пожалуйста, введите имя и фамилию (минимум 2 слова):")
         return
     await state.update_data(full_name=name)
     await state.set_state(OnboardingStates.region)
-    await message.answer("Из какого вы региона? Начните вводить название:")
-
-
-@router.message(OnboardingStates.region, F.text)
-async def process_region_search(message: Message, state: FSMContext, session):
-    regions = await user_service.search_regions(session, message.text.strip())
-    if not regions:
-        await message.answer("Регион не найден. Попробуйте ввести другое название:")
-        return
+    regions = await user_service.get_all_regions(session)
+    await state.update_data(all_regions=regions)
     await message.answer(
-        "Выберите регион:",
-        reply_markup=items_keyboard(regions, "onb_region"),
+        "Выберите ваш регион:",
+        reply_markup=paginated_items_keyboard(regions, "onb_region"),
     )
 
 
-@router.callback_query(F.data.startswith("onb_region:"))
-async def process_region_select(callback: CallbackQuery, state: FSMContext):
-    region_id = int(callback.data.split(":")[1])
-    await state.update_data(region_id=region_id)
-    await state.set_state(OnboardingStates.school)
-    await callback.message.edit_text("Введите название или номер школы:")
+@router.callback_query(OnboardingStates.region, F.data.startswith("onb_region_page:"))
+async def process_region_page(callback: CallbackQuery, state: FSMContext):
+    page = int(callback.data.split(":")[1])
+    data = await state.get_data()
+    regions = data["all_regions"]
+    await callback.message.edit_reply_markup(
+        reply_markup=paginated_items_keyboard(regions, "onb_region", page=page),
+    )
     await callback.answer()
 
 
-@router.message(OnboardingStates.school, F.text)
-async def process_school_search(message: Message, state: FSMContext, session):
-    data = await state.get_data()
-    schools = await user_service.search_schools(session, data["region_id"], message.text.strip())
-    if not schools:
-        await message.answer("Школа не найдена. Попробуйте другое название:")
-        return
-    await message.answer(
-        "Выберите школу:",
-        reply_markup=items_keyboard(schools, "onb_school"),
+@router.callback_query(OnboardingStates.region, F.data.startswith("onb_region:"))
+async def process_region_select(callback: CallbackQuery, state: FSMContext, session):
+    region_id = int(callback.data.split(":")[1])
+    await state.update_data(region_id=region_id)
+    await state.set_state(OnboardingStates.school)
+    schools = await user_service.get_schools_by_region(session, region_id)
+    await state.update_data(all_schools=schools)
+    await callback.message.edit_text(
+        "Выберите вашу школу:",
+        reply_markup=paginated_items_keyboard(schools, "onb_school"),
     )
+    await callback.answer()
 
 
-@router.callback_query(F.data.startswith("onb_school:"))
+@router.callback_query(OnboardingStates.school, F.data.startswith("onb_school_page:"))
+async def process_school_page(callback: CallbackQuery, state: FSMContext):
+    page = int(callback.data.split(":")[1])
+    data = await state.get_data()
+    schools = data["all_schools"]
+    await callback.message.edit_reply_markup(
+        reply_markup=paginated_items_keyboard(schools, "onb_school", page=page),
+    )
+    await callback.answer()
+
+
+@router.callback_query(OnboardingStates.school, F.data.startswith("onb_school:"))
 async def process_school_select(callback: CallbackQuery, state: FSMContext, session):
     school_id = int(callback.data.split(":")[1])
     await state.update_data(school_id=school_id)

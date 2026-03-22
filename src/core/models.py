@@ -48,8 +48,8 @@ class School(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    municipality_id: Mapped[int] = mapped_column(
-        ForeignKey("municipalities.id"), nullable=False
+    municipality_id: Mapped[int | None] = mapped_column(
+        ForeignKey("municipalities.id"), nullable=True
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
 

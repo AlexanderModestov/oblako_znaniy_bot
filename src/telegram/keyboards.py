@@ -68,6 +68,33 @@ def pagination_keyboard(page: int, total_pages: int, callback_prefix: str) -> In
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
+def paginated_items_keyboard(
+    items: list[dict], callback_prefix: str, page: int = 1, per_page: int = 8,
+) -> InlineKeyboardMarkup:
+    total_pages = max(1, -(-len(items) // per_page))  # ceil division
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * per_page
+    page_items = items[start : start + per_page]
+
+    buttons = []
+    for item in page_items:
+        btn_id = item.get("id", item.get("name", ""))
+        buttons.append([
+            InlineKeyboardButton(text=item["name"], callback_data=f"{callback_prefix}:{btn_id}")
+        ])
+
+    if total_pages > 1:
+        nav_row = []
+        if page > 1:
+            nav_row.append(InlineKeyboardButton(text="\u25c0 Назад", callback_data=f"{callback_prefix}_page:{page - 1}"))
+        nav_row.append(InlineKeyboardButton(text=f"{page}/{total_pages}", callback_data="noop"))
+        if page < total_pages:
+            nav_row.append(InlineKeyboardButton(text="Далее \u25b6", callback_data=f"{callback_prefix}_page:{page + 1}"))
+        buttons.append(nav_row)
+
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
 def contact_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="\U0001f4f1 Отправить контакт", request_contact=True)]],

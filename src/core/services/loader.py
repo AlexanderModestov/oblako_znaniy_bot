@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
-from src.core.models import Lesson, Region, School, Subject
+from src.core.models import Lesson, Municipality, Region, School, Subject
 
 logger = logging.getLogger(__name__)
 
@@ -50,16 +50,25 @@ def parse_lessons_rows(rows: list[dict]) -> tuple[list[dict], list[int]]:
     return lessons, errors
 
 
-def parse_regions_schools_rows(rows: list[dict]) -> tuple[set[str], list[dict]]:
+def parse_regions_schools_rows(rows: list[dict]) -> tuple[set[str], dict[str, set[str]], list[dict]]:
     regions = set()
+    municipalities = {}  # {(region, municipality_name): set()}
     schools = []
     for row in rows:
-        region = row.get("Регион", "").strip()
-        school = row.get("Школа", "").strip()
-        if region and school:
+        region = str(row.get("Регион", "")).strip()
+        municipality = str(row.get("Наименование муниципалитета", "")).strip()
+        school = str(row.get("Школа", "")).strip()
+        if region:
             regions.add(region)
-            schools.append({"region": region, "school": school})
-    return regions, schools
+        if region and municipality:
+            municipalities[(region, municipality)] = None
+        if region and school:
+            schools.append({
+                "region": region,
+                "municipality": municipality or None,
+                "school": school,
+            })
+    return regions, municipalities, schools
 
 
 def _get_gspread_client() -> gspread.Client:
@@ -95,7 +104,7 @@ def fetch_subjects_from_sheets() -> list[dict]:
     settings = get_settings()
     client = _get_gspread_client()
     spreadsheet = client.open_by_key(settings.google_sheets_lessons_id)
-    sheet = spreadsheet.worksheet("subject")
+    sheet = spreadsheet.worksheet("subjects")
     return sheet.get_all_records()
 
 
@@ -133,7 +142,7 @@ async def reload_subjects_data(session: AsyncSession) -> dict:
 
 async def reload_schools_data(session: AsyncSession) -> dict:
     rows = fetch_schools_from_sheets()
-    regions_set, schools_list = parse_regions_schools_rows(rows)
+    regions_set, municipalities_dict, schools_list = parse_regions_schools_rows(rows)
 
     # Batch upsert regions
     if regions_set:
@@ -145,21 +154,43 @@ async def reload_schools_data(session: AsyncSession) -> dict:
     result = await session.execute(select(Region))
     region_map = {r.name: r.id for r in result.scalars().all()}
 
+    # Batch upsert municipalities
+    muni_values = []
+    for (region_name, muni_name) in municipalities_dict:
+        region_id = region_map.get(region_name)
+        if region_id and muni_name:
+            muni_values.append({"region_id": region_id, "name": muni_name})
+
+    for i in range(0, len(muni_values), 500):
+        batch = muni_values[i : i + 500]
+        stmt = pg_insert(Municipality).values(batch)
+        stmt = stmt.on_conflict_do_nothing(constraint="uq_municipalities_region_id_name")
+        await session.execute(stmt)
+    await session.flush()
+
+    # Build municipality map: (region_name, muni_name) -> muni_id
+    result = await session.execute(select(Municipality).join(Region))
+    muni_map = {}
+    for m in result.scalars().all():
+        region_name = next((rn for rn, rid in region_map.items() if rid == m.region_id), None)
+        if region_name:
+            muni_map[(region_name, m.name)] = m.id
+
     # Batch upsert schools in chunks of 500
     school_values = []
     for item in schools_list:
-        region_id = region_map.get(item["region"])
-        if region_id:
-            school_values.append({"region_id": region_id, "name": item["school"]})
+        muni_id = muni_map.get((item["region"], item["municipality"]))
+        if muni_id:
+            school_values.append({"municipality_id": muni_id, "name": item["school"]})
 
     for i in range(0, len(school_values), 500):
         batch = school_values[i : i + 500]
         stmt = pg_insert(School).values(batch)
-        stmt = stmt.on_conflict_do_nothing(constraint="uq_schools_region_id_name")
+        stmt = stmt.on_conflict_do_nothing(constraint="uq_schools_municipality_id_name")
         await session.execute(stmt)
 
     await session.commit()
-    return {"regions": len(regions_set), "schools": len(school_values)}
+    return {"regions": len(regions_set), "municipalities": len(muni_values), "schools": len(school_values)}
 
 
 async def reload_lessons_data(session: AsyncSession) -> dict:

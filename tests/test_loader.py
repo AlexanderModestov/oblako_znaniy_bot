@@ -109,22 +109,23 @@ def test_parse_lessons_rows():
 
 def test_parse_regions_schools_rows():
     rows = [
-        {"Регион": "Москва", "Школа": "Школа №1"},
-        {"Регион": "Москва", "Школа": "Школа №2"},
-        {"Регион": "Санкт-Петербург", "Школа": "Гимназия №1"},
+        {"Регион": "Москва", "Наименование муниципалитета": "ЦАО", "Школа": "Школа №1"},
+        {"Регион": "Москва", "Наименование муниципалитета": "ЦАО", "Школа": "Школа №2"},
+        {"Регион": "Санкт-Петербург", "Наименование муниципалитета": "Центр", "Школа": "Гимназия №1"},
     ]
-    regions, schools = parse_regions_schools_rows(rows)
+    regions, municipalities, schools = parse_regions_schools_rows(rows)
     assert len(regions) == 2
     assert "Москва" in regions
     assert len(schools) == 3
+    assert len(municipalities) == 2
 
 
 def test_parse_regions_schools_rows_empty_values():
     rows = [
-        {"Регион": "Москва", "Школа": "Школа №1"},
-        {"Регион": "", "Школа": "Школа №2"},
-        {"Регион": "Москва", "Школа": ""},
+        {"Регион": "Москва", "Наименование муниципалитета": "ЦАО", "Школа": "Школа №1"},
+        {"Регион": "", "Наименование муниципалитета": "", "Школа": "Школа №2"},
+        {"Регион": "Москва", "Наименование муниципалитета": "ЦАО", "Школа": ""},
     ]
-    regions, schools = parse_regions_schools_rows(rows)
+    regions, municipalities, schools = parse_regions_schools_rows(rows)
     assert len(regions) == 1
     assert len(schools) == 1

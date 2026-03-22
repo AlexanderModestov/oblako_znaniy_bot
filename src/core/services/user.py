@@ -1,7 +1,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.models import Region, School, Subject, User
+from src.core.models import Municipality, Region, School, Subject, User
 from src.core.schemas import UserCreate
 
 
@@ -29,6 +29,10 @@ class UserService:
         await session.refresh(user)
         return user
 
+    async def get_all_regions(self, session: AsyncSession) -> list[dict]:
+        result = await session.execute(select(Region).order_by(Region.name))
+        return [{"id": r.id, "name": r.name} for r in result.scalars().all()]
+
     async def search_regions(self, session: AsyncSession, query: str, limit: int = 8) -> list[dict]:
         escaped = _escape_like(query)
         result = await session.execute(
@@ -36,11 +40,21 @@ class UserService:
         )
         return [{"id": r.id, "name": r.name} for r in result.scalars().all()]
 
+    async def get_schools_by_region(self, session: AsyncSession, region_id: int) -> list[dict]:
+        result = await session.execute(
+            select(School)
+            .join(Municipality)
+            .where(Municipality.region_id == region_id)
+            .order_by(School.name)
+        )
+        return [{"id": s.id, "name": s.name} for s in result.scalars().all()]
+
     async def search_schools(self, session: AsyncSession, region_id: int, query: str, limit: int = 8) -> list[dict]:
         escaped = _escape_like(query)
         result = await session.execute(
             select(School)
-            .where(School.region_id == region_id, School.name.ilike(f"%{escaped}%"))
+            .join(Municipality)
+            .where(Municipality.region_id == region_id, School.name.ilike(f"%{escaped}%"))
             .order_by(School.name)
             .limit(limit)
         )

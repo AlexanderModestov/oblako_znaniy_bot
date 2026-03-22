@@ -38,8 +38,9 @@ async def cmd_reload(message: Message, session):
     try:
         schools_result = await reload_schools_data(session)
         await message.answer(
-            f"\u2705 Регионы/школы: {schools_result['regions']} регионов, "
-            f"{schools_result['schools']} школ"
+            f"\u2705 Регионы: {schools_result['regions']}, "
+            f"Муниципалитеты: {schools_result['municipalities']}, "
+            f"Школы: {schools_result['schools']}"
         )
     except Exception as e:
         logger.exception("Failed to reload schools")
