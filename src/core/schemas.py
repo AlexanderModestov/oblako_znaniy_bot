@@ -47,5 +47,5 @@ class FilterState(BaseModel):
     subject_id: int | None = None
     grade: int | None = None
     course_id: int | None = None
-    section_id: str | None = None
-    topic_id: str | None = None
+    section: str | None = None
+    topic: str | None = None

@@ -98,9 +98,22 @@ def search_pagination_keyboard(page: int, total_pages: int) -> InlineKeyboardMar
         nav_row.append(InlineKeyboardButton(text="Далее \u25b6", callback_data=f"search:page:{page + 1}"))
     buttons.append(nav_row)
     buttons.append([
-        InlineKeyboardButton(text="\U0001f50d Уточнить по параметрам", callback_data="search_params")
+        InlineKeyboardButton(text="\U0001f504 Новый поиск", callback_data="new_search")
     ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def search_choice_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="\U0001f50d Введите Ваш запрос", callback_data="search_text")],
+        [InlineKeyboardButton(text="\U0001f4da Поиск по учебным планам", callback_data="search_curriculum")],
+    ])
+
+
+def new_search_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="\U0001f504 Новый поиск", callback_data="new_search")],
+    ])
 
 
 def contact_keyboard() -> ReplyKeyboardMarkup:

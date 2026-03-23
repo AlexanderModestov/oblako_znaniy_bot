@@ -2,11 +2,23 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
+from src.telegram.keyboards import search_choice_keyboard
+
 router = Router()
 
 
 @router.callback_query(F.data == "new_search")
 async def new_search(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.edit_text(
+        "Выберите способ поиска:",
+        reply_markup=search_choice_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "search_text")
+async def search_text(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.message.edit_text(
         "Просто напишите, что вы ищете, и я найду подходящие уроки."

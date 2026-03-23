@@ -393,10 +393,6 @@ async def reload_lessons_data(session: AsyncSession, rows: list[dict]) -> dict:
     subject_map = {s.name: s.id for s in result.scalars().all()}
     result = await session.execute(select(Course.id))
     existing_course_ids = {row[0] for row in result.all()}
-    result = await session.execute(select(Section.id))
-    existing_section_ids = {row[0] for row in result.all()}
-    result = await session.execute(select(Topic.id))
-    existing_topic_ids = {row[0] for row in result.all()}
 
     # Parse rows
     lessons = []
@@ -421,14 +417,8 @@ async def reload_lessons_data(session: AsyncSession, rows: list[dict]) -> dict:
 
         # Validate FK references — set to None if not found
         course_id = _int_or_none(row, "Курс")
-        section_id = _str(row, "Раздел") or None
-        topic_id = _str(row, "Тема") or None
         if course_id and course_id not in existing_course_ids:
             course_id = None
-        if section_id and section_id not in existing_section_ids:
-            section_id = None
-        if topic_id and topic_id not in existing_topic_ids:
-            topic_id = None
 
         lessons.append({
             "id": lesson_id,
@@ -438,8 +428,8 @@ async def reload_lessons_data(session: AsyncSession, rows: list[dict]) -> dict:
             "url": url,
             "description": _str(row, "Описание урока") or None,
             "course_id": course_id,
-            "section_id": section_id,
-            "topic_id": topic_id,
+            "section": _str(row, "Раздел") or None,
+            "topic": _str(row, "Тема") or None,
         })
 
     logger.info("Parsed %d lessons, %d errors", len(lessons), len(errors))

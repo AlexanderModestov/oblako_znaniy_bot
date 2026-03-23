@@ -18,6 +18,7 @@ from src.telegram.keyboards import (
     contact_keyboard,
     items_keyboard,
     paginated_items_keyboard,
+    search_choice_keyboard,
     skip_keyboard,
     subjects_toggle_keyboard,
 )
@@ -42,7 +43,8 @@ async def cmd_start(message: Message, state: FSMContext, session):
         await state.clear()
         await message.answer(
             f"С возвращением, {user.full_name}!\n\n"
-            "Просто напишите, что вы ищете, и я найду подходящие уроки."
+            "Выберите способ поиска:",
+            reply_markup=search_choice_keyboard(),
         )
         return
 
@@ -218,5 +220,6 @@ async def _finish_onboarding(message, state: FSMContext, session, telegram_id: i
     await state.clear()
     await message.answer(
         "Регистрация завершена!\n\n"
-        "Просто напишите, что вы ищете, и я найду подходящие уроки."
+        "Выберите способ поиска:",
+        reply_markup=search_choice_keyboard(),
     )

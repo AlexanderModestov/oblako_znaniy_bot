@@ -25,6 +25,19 @@ def format_param_results(lessons: list[LessonResult]) -> str:
     return "\n\n".join(format_lesson_param(l) for l in lessons)
 
 
+def format_topic_lessons(lessons: list[LessonResult]) -> str:
+    if not lessons:
+        return "В данной теме пока нет уроков."
+    first = lessons[0]
+    parts = [p for p in [first.subject, first.section, first.topic] if p]
+    header = " | ".join(parts)
+    items = "\n\n".join(
+        f"{i}. \U0001f4da {l.title}\n   \u2192 {l.url}"
+        for i, l in enumerate(lessons, 1)
+    )
+    return f"\U0001f4cb {header}\n\nУроки ({len(lessons)}):\n\n{items}"
+
+
 def format_text_results(result: SearchResult) -> str:
     if not result.lessons:
         return (

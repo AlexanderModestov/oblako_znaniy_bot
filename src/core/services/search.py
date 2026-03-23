@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from src.config import get_settings
-from src.core.models import Lesson, Subject
+from src.core.models import Lesson
 from src.core.schemas import LessonResult, SearchResult
 
 logger = logging.getLogger(__name__)
@@ -36,8 +36,8 @@ class SearchService:
 
         offset = (page - 1) * self.per_page
         q = (
-            select(Lesson).join(Subject)
-            .options(joinedload(Lesson.subject), joinedload(Lesson.section), joinedload(Lesson.topic))
+            select(Lesson)
+            .options(joinedload(Lesson.subject))
             .where(Lesson.search_vector.op("@@")(ts_query))
             .order_by(func.ts_rank(Lesson.search_vector, ts_query).desc())
             .offset(offset).limit(self.per_page)
@@ -49,8 +49,8 @@ class SearchService:
                 title=l.title, url=l.url,
                 description=l.description,
                 subject=l.subject.name,
-                section=l.section.name if l.section else None,
-                topic=l.topic.name if l.topic else None,
+                section=l.section,
+                topic=l.topic,
                 is_semantic=False,
             )
             for l in result.scalars().unique().all()
@@ -69,8 +69,7 @@ class SearchService:
 
         q = (
             select(Lesson, Lesson.embedding.cosine_distance(query_embedding).label("distance"))
-            .join(Subject)
-            .options(joinedload(Lesson.section), joinedload(Lesson.topic), joinedload(Lesson.subject))
+            .options(joinedload(Lesson.subject))
             .where(Lesson.embedding.is_not(None))
         )
         if exclude_ids:
@@ -89,8 +88,8 @@ class SearchService:
                         title=lesson.title, url=lesson.url,
                         description=lesson.description,
                         subject=lesson.subject.name,
-                        section=lesson.section.name if lesson.section else None,
-                        topic=lesson.topic.name if lesson.topic else None,
+                        section=lesson.section,
+                        topic=lesson.topic,
                         is_semantic=True,
                     )
                 )

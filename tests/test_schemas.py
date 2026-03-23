@@ -81,5 +81,5 @@ def test_filter_state_defaults():
     assert state.subject_id is None
     assert state.grade is None
     assert state.course_id is None
-    assert state.section_id is None
-    assert state.topic_id is None
+    assert state.section is None
+    assert state.topic is None

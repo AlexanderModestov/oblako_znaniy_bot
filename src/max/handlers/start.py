@@ -8,6 +8,7 @@ from src.core.schemas import UserCreate
 from src.core.services.user import UserService
 from src.max.keyboards import (
     paginated_items_keyboard,
+    search_choice_keyboard,
     skip_keyboard,
     subjects_toggle_keyboard,
 )
@@ -30,10 +31,12 @@ class OnboardingStates(StatesGroup):
 async def on_bot_started(event: BotStarted, context: MemoryContext, session):
     user = await user_service.get_by_max_user_id(session, event.user.user_id)
     if user:
+        kb = search_choice_keyboard()
         await event.bot.send_message(
             chat_id=event.chat_id,
             text=f"С возвращением, {user.full_name}!\n\n"
-                 "Просто напишите, что вы ищете, и я найду подходящие уроки.",
+                 "Выберите способ поиска:",
+            attachments=[kb.as_markup()],
         )
         return
     await context.set_state(OnboardingStates.full_name)
@@ -192,9 +195,9 @@ async def _finish_onboarding(event, context: MemoryContext, session, max_user_id
             await event.answer(new_text=error_msg)
         return
     await context.clear()
-    success_msg = ("Регистрация завершена!\n\n"
-                   "Просто напишите, что вы ищете, и я найду подходящие уроки.")
+    kb = search_choice_keyboard()
+    success_msg = "Регистрация завершена!\n\nВыберите способ поиска:"
     if isinstance(event, MessageCreated):
-        await event.message.answer(success_msg)
+        await event.message.answer(success_msg, attachments=[kb.as_markup()])
     else:
-        await event.answer(new_text=success_msg)
+        await event.answer(new_text=success_msg, new_attachments=[kb.as_markup()])

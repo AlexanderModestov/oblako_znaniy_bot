@@ -5,10 +5,11 @@ from maxapi.types import MessageCallback
 from src.config import get_settings
 from src.core.schemas import FilterState
 from src.core.services.content import ContentService
-from src.max.formatters import format_param_results
+from src.max.formatters import format_param_results, format_topic_lessons
 from src.max.keyboards import (
     grades_keyboard,
     items_keyboard,
+    new_search_keyboard,
     pagination_keyboard,
 )
 
@@ -16,7 +17,7 @@ router = Router(router_id="max_param_search")
 content_service = ContentService()
 
 
-@router.message_callback(F.callback.payload == "search_params")
+@router.message_callback(F.callback.payload == "search_curriculum")
 async def start_param_search(event: MessageCallback, context: MemoryContext, session):
     subjects = await content_service.get_subjects(session)
     await context.update_data(filter={})
@@ -51,6 +52,7 @@ async def select_grade(event: MessageCallback, context: MemoryContext, session):
 
     sections = await content_service.get_sections(session, filters["subject_id"], grade)
     if sections:
+        await context.update_data(ps_sections=sections)
         kb = items_keyboard(sections, "ps_section", add_skip=True)
         await event.bot.edit_message(
             message_id=event.message.body.mid,
@@ -71,12 +73,15 @@ async def select_section(event: MessageCallback, context: MemoryContext, session
         await _show_results(event, context, session)
         return
 
-    section_id = int(value)
-    filters["section_id"] = section_id
+    # Look up section name by index
+    sections = data.get("ps_sections", [])
+    section_name = sections[int(value)]["name"]
+    filters["section"] = section_name
     await context.update_data(filter=filters)
 
-    topics = await content_service.get_topics(session, filters["subject_id"], filters["grade"], section_id)
+    topics = await content_service.get_topics(session, filters["subject_id"], filters["grade"], section_name)
     if topics:
+        await context.update_data(ps_topics=topics)
         kb = items_keyboard(topics, "ps_topic", add_skip=True)
         await event.bot.edit_message(
             message_id=event.message.body.mid,
@@ -94,7 +99,9 @@ async def select_topic(event: MessageCallback, context: MemoryContext, session):
     filters = data["filter"]
 
     if value != "skip":
-        filters["topic_id"] = int(value)
+        # Look up topic name by index
+        topics = data.get("ps_topics", [])
+        filters["topic"] = topics[int(value)]["name"]
         await context.update_data(filter=filters)
 
     await _show_results(event, context, session)
@@ -109,6 +116,19 @@ async def paginate_results(event: MessageCallback, context: MemoryContext, sessi
 async def _show_results(event: MessageCallback, context: MemoryContext, session, page=1):
     data = await context.get_data()
     filters = FilterState(**data["filter"])
+
+    # If topic is selected, show all lessons at once
+    if filters.topic:
+        lessons = await content_service.get_all_lessons(session, filters)
+        text = format_topic_lessons(lessons)
+        kb = new_search_keyboard()
+        await event.bot.edit_message(
+            message_id=event.message.body.mid,
+            text=text,
+            attachments=[kb.as_markup()],
+        )
+        return
+
     per_page = get_settings().results_per_page
     lessons, total = await content_service.get_lessons(session, filters, page=page, per_page=per_page)
 

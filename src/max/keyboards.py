@@ -67,6 +67,19 @@ def paginated_items_keyboard(
     return kb
 
 
+def search_choice_keyboard() -> InlineKeyboardBuilder:
+    kb = InlineKeyboardBuilder()
+    kb.row(CallbackButton(text="\U0001f50d Введите Ваш запрос", payload="search_text"))
+    kb.row(CallbackButton(text="\U0001f4da Поиск по учебным планам", payload="search_curriculum"))
+    return kb
+
+
+def new_search_keyboard() -> InlineKeyboardBuilder:
+    kb = InlineKeyboardBuilder()
+    kb.row(CallbackButton(text="\U0001f504 Новый поиск", payload="new_search"))
+    return kb
+
+
 def search_pagination_keyboard(page: int, total_pages: int) -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
     nav_row = []
@@ -76,7 +89,7 @@ def search_pagination_keyboard(page: int, total_pages: int) -> InlineKeyboardBui
     if page < total_pages:
         nav_row.append(CallbackButton(text="Далее \u25b6", payload=f"search:page:{page + 1}"))
     kb.row(*nav_row)
-    kb.row(CallbackButton(text="\U0001f50d Уточнить по параметрам", payload="search_params"))
+    kb.row(CallbackButton(text="\U0001f504 Новый поиск", payload="new_search"))
     return kb
 
 

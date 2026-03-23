@@ -2,7 +2,7 @@ from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from src.core.models import Lesson, Section, Subject, Topic
+from src.core.models import Lesson, Subject
 from src.core.schemas import FilterState, LessonResult
 
 
@@ -21,31 +21,55 @@ class ContentService:
 
     async def get_sections(self, session: AsyncSession, subject_id: int, grade: int) -> list[dict]:
         result = await session.execute(
-            select(distinct(Lesson.section_id))
+            select(distinct(Lesson.section))
             .where(Lesson.subject_id == subject_id, Lesson.grade == grade)
-            .where(Lesson.section_id.is_not(None))
+            .where(Lesson.section.is_not(None))
+            .order_by(Lesson.section)
         )
-        section_ids = list(result.scalars().all())
-        if not section_ids:
-            return []
-        sections_result = await session.execute(
-            select(Section).where(Section.id.in_(section_ids)).order_by(Section.name)
-        )
-        return [{"id": s.id, "name": s.name} for s in sections_result.scalars().all()]
+        names = list(result.scalars().all())
+        return [{"id": i, "name": name} for i, name in enumerate(names)]
 
-    async def get_topics(self, session: AsyncSession, subject_id: int, grade: int, section_id: int) -> list[dict]:
+    async def get_topics(self, session: AsyncSession, subject_id: int, grade: int, section: str) -> list[dict]:
         result = await session.execute(
-            select(distinct(Lesson.topic_id))
-            .where(Lesson.subject_id == subject_id, Lesson.grade == grade, Lesson.section_id == section_id)
-            .where(Lesson.topic_id.is_not(None))
+            select(distinct(Lesson.topic))
+            .where(Lesson.subject_id == subject_id, Lesson.grade == grade, Lesson.section == section)
+            .where(Lesson.topic.is_not(None))
+            .order_by(Lesson.topic)
         )
-        topic_ids = list(result.scalars().all())
-        if not topic_ids:
-            return []
-        topics_result = await session.execute(
-            select(Topic).where(Topic.id.in_(topic_ids)).order_by(Topic.name)
+        names = list(result.scalars().all())
+        return [{"id": i, "name": name} for i, name in enumerate(names)]
+
+    async def get_all_lessons(self, session: AsyncSession, filters: FilterState) -> list[LessonResult]:
+        """Get all lessons matching filters without pagination."""
+        base_where = []
+        if filters.subject_id:
+            base_where.append(Lesson.subject_id == filters.subject_id)
+        if filters.grade:
+            base_where.append(Lesson.grade == filters.grade)
+        if filters.section:
+            base_where.append(Lesson.section == filters.section)
+        if filters.topic:
+            base_where.append(Lesson.topic == filters.topic)
+
+        query = (
+            select(Lesson)
+            .options(joinedload(Lesson.subject))
+            .where(*base_where)
+            .order_by(Lesson.title)
         )
-        return [{"id": t.id, "name": t.name} for t in topics_result.scalars().all()]
+        result = await session.execute(query)
+
+        return [
+            LessonResult(
+                title=l.title,
+                url=l.url,
+                description=l.description,
+                subject=l.subject.name,
+                section=l.section,
+                topic=l.topic,
+            )
+            for l in result.scalars().unique().all()
+        ]
 
     async def get_lessons(self, session: AsyncSession, filters: FilterState, page: int = 1, per_page: int = 5) -> tuple[list[LessonResult], int]:
         base_where = []
@@ -53,10 +77,10 @@ class ContentService:
             base_where.append(Lesson.subject_id == filters.subject_id)
         if filters.grade:
             base_where.append(Lesson.grade == filters.grade)
-        if filters.section_id:
-            base_where.append(Lesson.section_id == filters.section_id)
-        if filters.topic_id:
-            base_where.append(Lesson.topic_id == filters.topic_id)
+        if filters.section:
+            base_where.append(Lesson.section == filters.section)
+        if filters.topic:
+            base_where.append(Lesson.topic == filters.topic)
 
         count_query = select(func.count(Lesson.id)).where(*base_where)
         count_result = await session.execute(count_query)
@@ -65,7 +89,7 @@ class ContentService:
         offset = (page - 1) * per_page
         query = (
             select(Lesson)
-            .options(joinedload(Lesson.subject), joinedload(Lesson.section), joinedload(Lesson.topic))
+            .options(joinedload(Lesson.subject))
             .where(*base_where)
             .order_by(Lesson.title)
             .offset(offset)
@@ -79,8 +103,8 @@ class ContentService:
                 url=l.url,
                 description=l.description,
                 subject=l.subject.name,
-                section=l.section.name if l.section else None,
-                topic=l.topic.name if l.topic else None,
+                section=l.section,
+                topic=l.topic,
             )
             for l in result.scalars().unique().all()
         ]
