@@ -2,7 +2,7 @@ from aiogram import F, Router
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 
 from src.core.schemas import UserCreate
 from src.core.services.user import UserService
@@ -143,6 +143,8 @@ async def process_subject_toggle(callback: CallbackQuery, state: FSMContext):
 @router.message(OnboardingStates.phone, F.contact)
 async def process_phone_contact(message: Message, state: FSMContext):
     await state.update_data(phone=message.contact.phone_number)
+    # Remove contact keyboard
+    await message.answer("Контакт получен.", reply_markup=ReplyKeyboardRemove())
     await state.set_state(OnboardingStates.email)
     await message.answer(
         "Введите email (или нажмите «Пропустить»):",
@@ -157,6 +159,8 @@ async def process_phone_text(message: Message, state: FSMContext):
         await message.answer("Введите корректный номер телефона:")
         return
     await state.update_data(phone=phone)
+    # Remove contact keyboard
+    await message.answer("Номер получен.", reply_markup=ReplyKeyboardRemove())
     await state.set_state(OnboardingStates.email)
     await message.answer(
         "Введите email (или нажмите «Пропустить»):",
