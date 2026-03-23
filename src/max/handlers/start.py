@@ -1,0 +1,198 @@
+import logging
+
+from maxapi import F, Router
+from maxapi.context import MemoryContext, State, StatesGroup
+from maxapi.types import BotStarted, MessageCallback, MessageCreated
+
+from src.core.schemas import UserCreate
+from src.core.services.user import UserService
+from src.max.keyboards import (
+    contact_keyboard,
+    paginated_items_keyboard,
+    skip_keyboard,
+    subjects_toggle_keyboard,
+)
+
+router = Router(router_id="max_start")
+user_service = UserService()
+logger = logging.getLogger("max.start")
+
+
+class OnboardingStates(StatesGroup):
+    full_name = State()
+    region = State()
+    school = State()
+    subjects = State()
+    phone = State()
+    email = State()
+
+
+@router.bot_started()
+async def on_bot_started(event: BotStarted, context: MemoryContext, session):
+    user = await user_service.get_by_max_user_id(session, event.user.user_id)
+    if user:
+        await event.bot.send_message(
+            chat_id=event.chat_id,
+            text=f"С возвращением, {user.full_name}!\n\n"
+                 "Просто напишите, что вы ищете, и я найду подходящие уроки.",
+        )
+        return
+    await context.set_state(OnboardingStates.full_name)
+    await event.bot.send_message(
+        chat_id=event.chat_id,
+        text="Добро пожаловать! Давайте зарегистрируемся.\n\n"
+             "Введите ваше имя и фамилию:",
+    )
+
+
+@router.message_created(F.message.body.text, OnboardingStates.full_name)
+async def process_name(event: MessageCreated, context: MemoryContext, session):
+    name = event.message.body.text.strip()
+    if len(name.split()) < 2:
+        await event.message.answer("Пожалуйста, введите имя и фамилию (минимум 2 слова):")
+        return
+    await context.update_data(full_name=name)
+    await context.set_state(OnboardingStates.region)
+    regions = await user_service.get_all_regions(session)
+    await context.update_data(all_regions=regions)
+    kb = paginated_items_keyboard(regions, "onb_region")
+    await event.message.answer("Выберите ваш регион:", attachments=[kb.as_markup()])
+
+
+@router.message_callback(F.callback.payload.startswith("onb_region_page:"), OnboardingStates.region)
+async def process_region_page(event: MessageCallback, context: MemoryContext):
+    page = int(event.callback.payload.split(":")[1])
+    data = await context.get_data()
+    regions = data["all_regions"]
+    kb = paginated_items_keyboard(regions, "onb_region", page=page)
+    await event.bot.edit_message(
+        message_id=event.message.body.mid,
+        text="Выберите ваш регион:",
+        attachments=[kb.as_markup()],
+    )
+
+
+@router.message_callback(F.callback.payload.startswith("onb_region:"), OnboardingStates.region)
+async def process_region_select(event: MessageCallback, context: MemoryContext, session):
+    region_id = int(event.callback.payload.split(":")[1])
+    await context.update_data(region_id=region_id)
+    await context.set_state(OnboardingStates.school)
+    schools = await user_service.get_schools_by_region(session, region_id)
+    await context.update_data(all_schools=schools)
+    kb = paginated_items_keyboard(schools, "onb_school")
+    await event.bot.edit_message(
+        message_id=event.message.body.mid,
+        text="Выберите вашу школу:",
+        attachments=[kb.as_markup()],
+    )
+
+
+@router.message_callback(F.callback.payload.startswith("onb_school_page:"), OnboardingStates.school)
+async def process_school_page(event: MessageCallback, context: MemoryContext):
+    page = int(event.callback.payload.split(":")[1])
+    data = await context.get_data()
+    schools = data["all_schools"]
+    kb = paginated_items_keyboard(schools, "onb_school", page=page)
+    await event.bot.edit_message(
+        message_id=event.message.body.mid,
+        text="Выберите вашу школу:",
+        attachments=[kb.as_markup()],
+    )
+
+
+@router.message_callback(F.callback.payload.startswith("onb_school:"), OnboardingStates.school)
+async def process_school_select(event: MessageCallback, context: MemoryContext, session):
+    school_id = int(event.callback.payload.split(":")[1])
+    await context.update_data(school_id=school_id)
+    await context.set_state(OnboardingStates.subjects)
+    subjects = await user_service.get_all_subjects(session)
+    await context.update_data(available_subjects=subjects, selected_subjects=[])
+    kb = subjects_toggle_keyboard(subjects, set())
+    await event.bot.edit_message(
+        message_id=event.message.body.mid,
+        text="Какие предметы вы ведёте? Выберите и нажмите «Готово»:",
+        attachments=[kb.as_markup()],
+    )
+
+
+@router.message_callback(F.callback.payload.startswith("onb_subj:"), OnboardingStates.subjects)
+async def process_subject_toggle(event: MessageCallback, context: MemoryContext):
+    value = event.callback.payload.split(":")[1]
+    data = await context.get_data()
+    selected = set(data.get("selected_subjects", []))
+    subjects = data["available_subjects"]
+
+    if value == "done":
+        await context.update_data(subjects=list(selected))
+        await context.set_state(OnboardingStates.phone)
+        kb = contact_keyboard()
+        await event.bot.edit_message(
+            message_id=event.message.body.mid,
+            text="Поделитесь номером телефона (нажмите кнопку или введите вручную):",
+            attachments=[kb.as_markup()],
+        )
+        return
+
+    subj_id = int(value)
+    if subj_id in selected:
+        selected.discard(subj_id)
+    else:
+        selected.add(subj_id)
+    await context.update_data(selected_subjects=list(selected))
+    kb = subjects_toggle_keyboard(subjects, selected)
+    await event.bot.edit_message(
+        message_id=event.message.body.mid,
+        text="Какие предметы вы ведёте? Выберите и нажмите «Готово»:",
+        attachments=[kb.as_markup()],
+    )
+
+
+@router.message_created(F.message.body.text, OnboardingStates.phone)
+async def process_phone_text(event: MessageCreated, context: MemoryContext):
+    phone = event.message.body.text.strip()
+    if len(phone) < 10:
+        await event.message.answer("Введите корректный номер телефона:")
+        return
+    await context.update_data(phone=phone)
+    await context.set_state(OnboardingStates.email)
+    kb = skip_keyboard()
+    await event.message.answer(
+        "Введите email (или нажмите «Пропустить»):",
+        attachments=[kb.as_markup()],
+    )
+
+
+@router.message_created(F.message.body.text, OnboardingStates.email)
+async def process_email(event: MessageCreated, context: MemoryContext, session):
+    await context.update_data(email=event.message.body.text.strip())
+    await _finish_onboarding(event, context, session, max_user_id=event.message.sender.user_id)
+
+
+@router.message_callback(F.callback.payload == "onb_skip", OnboardingStates.email)
+async def process_email_skip(event: MessageCallback, context: MemoryContext, session):
+    await _finish_onboarding(event, context, session, max_user_id=event.callback.user.user_id)
+
+
+async def _finish_onboarding(event, context: MemoryContext, session, max_user_id: int):
+    data = await context.get_data()
+    user_data = UserCreate(
+        max_user_id=max_user_id,
+        full_name=data["full_name"],
+        phone=data["phone"],
+        email=data.get("email"),
+        region_id=data["region_id"],
+        school_id=data["school_id"],
+        subjects=data.get("subjects", []),
+    )
+    await user_service.create_user(session, user_data)
+    await context.clear()
+    if isinstance(event, MessageCreated):
+        await event.message.answer(
+            "Регистрация завершена!\n\n"
+            "Просто напишите, что вы ищете, и я найду подходящие уроки.",
+        )
+    else:
+        await event.answer(
+            new_text="Регистрация завершена!\n\n"
+                     "Просто напишите, что вы ищете, и я найду подходящие уроки.",
+        )
