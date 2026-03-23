@@ -2,8 +2,16 @@ from aiogram import F, Router
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+    ReplyKeyboardRemove,
+    WebAppInfo,
+)
 
+from src.config import get_settings
 from src.core.schemas import UserCreate
 from src.core.services.user import UserService
 from src.telegram.keyboards import (
@@ -37,6 +45,21 @@ async def cmd_start(message: Message, state: FSMContext, session):
             "Просто напишите, что вы ищете, и я найду подходящие уроки."
         )
         return
+
+    settings = get_settings()
+    if settings.web_app_url:
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="Зарегистрироваться",
+                web_app=WebAppInfo(url=settings.web_app_url),
+            )]
+        ])
+        await message.answer(
+            "Добро пожаловать! Нажмите кнопку ниже для регистрации:",
+            reply_markup=keyboard,
+        )
+        return
+
     await state.set_state(OnboardingStates.full_name)
     await message.answer(
         "Добро пожаловать! Давайте зарегистрируемся.\n\n"

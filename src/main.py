@@ -1,7 +1,6 @@
 import asyncio
 import logging
 
-from aiogram.types import MenuButtonWebApp, WebAppInfo
 
 from src.config import get_settings
 
@@ -20,14 +19,6 @@ async def start_telegram():
     dp.update.middleware(DatabaseMiddleware())
     register_all_routers(dp)
 
-    if settings.web_app_url:
-        await bot.set_chat_menu_button(
-            menu_button=MenuButtonWebApp(
-                text="Регистрация",
-                web_app=WebAppInfo(url=settings.web_app_url),
-            )
-        )
-        logger.info("Telegram MenuButton set to Web App: %s", settings.web_app_url)
 
     logger.info("Telegram bot starting polling...")
     await dp.start_polling(bot)
