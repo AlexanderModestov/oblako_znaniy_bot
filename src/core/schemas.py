@@ -5,6 +5,7 @@ from pydantic import BaseModel, field_validator
 
 class UserCreate(BaseModel):
     telegram_id: int | None = None
+    max_user_id: int | None = None
     full_name: str
     phone: str
     email: str | None = None
@@ -14,9 +15,9 @@ class UserCreate(BaseModel):
 
     @field_validator("full_name")
     @classmethod
-    def name_must_have_two_words(cls, v: str) -> str:
-        if len(v.strip().split()) < 2:
-            raise ValueError("Введите имя и фамилию (минимум 2 слова)")
+    def name_must_have_three_words(cls, v: str) -> str:
+        if len(v.strip().split()) < 3:
+            raise ValueError("Введите полное ФИО (Фамилия Имя Отчество)")
         return v.strip()
 
 

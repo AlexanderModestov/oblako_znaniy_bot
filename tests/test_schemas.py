@@ -12,13 +12,13 @@ from src.core.schemas import (
 def test_user_create_valid():
     user = UserCreate(
         telegram_id=123456,
-        full_name="Иван Петров",
+        full_name="Петров Иван Сергеевич",
         phone="+79001234567",
         region_id=1,
         school_id=1,
         subjects=[1, 2],
     )
-    assert user.full_name == "Иван Петров"
+    assert user.full_name == "Петров Иван Сергеевич"
 
 
 def test_user_create_name_too_short():
@@ -26,6 +26,14 @@ def test_user_create_name_too_short():
         UserCreate(
             telegram_id=123,
             full_name="Иван",
+            phone="+79001234567",
+            region_id=1,
+            school_id=1,
+        )
+    with pytest.raises(ValidationError):
+        UserCreate(
+            telegram_id=123,
+            full_name="Иван Петров",
             phone="+79001234567",
             region_id=1,
             school_id=1,

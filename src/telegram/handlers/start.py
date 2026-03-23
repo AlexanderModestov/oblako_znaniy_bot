@@ -40,15 +40,15 @@ async def cmd_start(message: Message, state: FSMContext, session):
     await state.set_state(OnboardingStates.full_name)
     await message.answer(
         "Добро пожаловать! Давайте зарегистрируемся.\n\n"
-        "Введите ваше имя и фамилию:"
+        "Введите ваше ФИО (Фамилия Имя Отчество) одним сообщением:"
     )
 
 
 @router.message(OnboardingStates.full_name)
 async def process_name(message: Message, state: FSMContext, session):
     name = message.text.strip()
-    if len(name.split()) < 2:
-        await message.answer("Пожалуйста, введите имя и фамилию (минимум 2 слова):")
+    if len(name.split()) < 3:
+        await message.answer("Пожалуйста, введите полное ФИО (Фамилия Имя Отчество) одним сообщением:")
         return
     await state.update_data(full_name=name)
     await state.set_state(OnboardingStates.region)
