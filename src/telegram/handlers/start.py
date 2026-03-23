@@ -10,6 +10,7 @@ from aiogram.types import (
     ReplyKeyboardRemove,
     WebAppInfo,
 )
+import json
 
 from src.config import get_settings
 from src.core.schemas import UserCreate
@@ -55,7 +56,7 @@ async def cmd_start(message: Message, state: FSMContext, session):
             )]
         ])
         await message.answer(
-            "Добро пожаловать! Нажмите кнопку ниже для регистрации:",
+            "Добро пожаловать! Для начала работы пройдите регистрацию:",
             reply_markup=keyboard,
         )
         return
@@ -177,9 +178,9 @@ async def process_phone_contact(message: Message, state: FSMContext):
 
 @router.message(OnboardingStates.phone, F.text)
 async def process_phone_text(message: Message, state: FSMContext):
-    phone = message.text.strip()
-    if len(phone) < 10:
-        await message.answer("Введите корректный номер телефона:")
+    phone = message.text.strip().replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+    if not (phone.startswith("+7") and len(phone) == 12 and phone[1:].isdigit()):
+        await message.answer("Введите номер в формате +7XXXXXXXXXX:")
         return
     await state.update_data(phone=phone)
     # Remove contact keyboard
@@ -221,3 +222,18 @@ async def _finish_onboarding(message, state: FSMContext, session, telegram_id: i
         "Регистрация завершена!\n\n"
         "Просто напишите, что вы ищете, и я найду подходящие уроки."
     )
+
+
+@router.message(F.web_app_data)
+async def process_web_app_data(message: Message, session):
+    try:
+        data = json.loads(message.web_app_data.data)
+    except (json.JSONDecodeError, AttributeError):
+        return
+
+    if data.get("event") == "registration_complete":
+        full_name = data.get("full_name", "")
+        await message.answer(
+            f"Регистрация завершена, {full_name}!\n\n"
+            "Просто напишите, что вы ищете, и я найду подходящие уроки."
+        )

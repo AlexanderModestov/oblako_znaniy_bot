@@ -40,7 +40,7 @@ async def on_bot_started(event: BotStarted, context: MemoryContext, session):
     await event.bot.send_message(
         chat_id=event.chat_id,
         text="Добро пожаловать! Давайте зарегистрируемся.\n\n"
-             "Введите ваше имя и фамилию:",
+             "Введите Ваше ФИО:",
     )
 
 
@@ -146,9 +146,9 @@ async def process_subject_toggle(event: MessageCallback, context: MemoryContext)
 
 @router.message_created(F.message.body.text, OnboardingStates.phone)
 async def process_phone_text(event: MessageCreated, context: MemoryContext):
-    phone = event.message.body.text.strip()
-    if len(phone) < 10:
-        await event.message.answer("Введите корректный номер телефона:")
+    phone = event.message.body.text.strip().replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+    if not (phone.startswith("+7") and len(phone) == 12 and phone[1:].isdigit()):
+        await event.message.answer("Введите номер в формате +7XXXXXXXXXX:")
         return
     await context.update_data(phone=phone)
     await context.set_state(OnboardingStates.email)

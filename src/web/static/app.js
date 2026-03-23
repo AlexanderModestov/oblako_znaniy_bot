@@ -160,8 +160,8 @@ function showStep(n) {
 // ===== Step 1: ФИО =====
 function validateName() {
     var val = $inputName.value.trim();
-    if (val.split(/\s+/).length < 2) {
-        $errorName.textContent = 'Введите имя и фамилию (минимум 2 слова)';
+    if (val.split(/\s+/).length < 3) {
+        $errorName.textContent = 'Введите фамилию, имя и отчество (3 слова)';
         return false;
     }
     $errorName.textContent = '';
@@ -316,8 +316,8 @@ function handleStep4() {
 // ===== Step 5: Phone =====
 function validatePhone() {
     var val = $inputPhone.value.trim().replace(/[\s\-\(\)]/g, '');
-    if (val.length < 10) {
-        $errorPhone.textContent = 'Номер телефона должен содержать минимум 10 цифр';
+    if (!/^\+7\d{10}$/.test(val)) {
+        $errorPhone.textContent = 'Введите номер в формате +7XXXXXXXXXX';
         return false;
     }
     $errorPhone.textContent = '';
@@ -373,7 +373,7 @@ async function submitRegistration() {
         hideAll();
         $success.classList.remove('hidden');
         setTimeout(function () {
-            tg.close();
+            tg.sendData(JSON.stringify({event: 'registration_complete', full_name: formData.full_name}));
         }, 2000);
     } catch (err) {
         tg.MainButton.hideProgress();
