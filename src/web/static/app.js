@@ -373,7 +373,7 @@ async function submitRegistration() {
         hideAll();
         $success.classList.remove('hidden');
         setTimeout(function () {
-            tg.sendData(JSON.stringify({event: 'registration_complete', full_name: formData.full_name}));
+            tg.close();
         }, 2000);
     } catch (err) {
         tg.MainButton.hideProgress();

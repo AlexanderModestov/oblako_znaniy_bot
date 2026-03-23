@@ -1,10 +1,16 @@
+import logging
+
+from aiogram import Bot
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config import get_settings
 from src.core.database import get_async_session
 from src.core.schemas import UserCreate
 from src.core.services.user import UserService
 from src.web.auth import get_platform_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 user_service = UserService()
@@ -82,4 +88,17 @@ async def register(
         data.telegram_id = user["id"]
         data.max_user_id = None
     db_user = await user_service.create_user(session, data)
+
+    if platform == "telegram" and data.telegram_id:
+        try:
+            bot = Bot(token=get_settings().bot_token)
+            async with bot:
+                await bot.send_message(
+                    chat_id=data.telegram_id,
+                    text=f"Регистрация завершена, {data.full_name}!\n\n"
+                         "Просто напишите, что вы ищете, и я найду подходящие уроки.",
+                )
+        except Exception:
+            logger.exception("Failed to send post-registration message")
+
     return {"ok": True, "user_id": db_user.id}

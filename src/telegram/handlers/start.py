@@ -10,7 +10,6 @@ from aiogram.types import (
     ReplyKeyboardRemove,
     WebAppInfo,
 )
-import json
 
 from src.config import get_settings
 from src.core.schemas import UserCreate
@@ -222,18 +221,3 @@ async def _finish_onboarding(message, state: FSMContext, session, telegram_id: i
         "Регистрация завершена!\n\n"
         "Просто напишите, что вы ищете, и я найду подходящие уроки."
     )
-
-
-@router.message(F.web_app_data)
-async def process_web_app_data(message: Message, session):
-    try:
-        data = json.loads(message.web_app_data.data)
-    except (json.JSONDecodeError, AttributeError):
-        return
-
-    if data.get("event") == "registration_complete":
-        full_name = data.get("full_name", "")
-        await message.answer(
-            f"Регистрация завершена, {full_name}!\n\n"
-            "Просто напишите, что вы ищете, и я найду подходящие уроки."
-        )
