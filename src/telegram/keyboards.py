@@ -6,7 +6,9 @@ from aiogram.types import (
 )
 
 
-def items_keyboard(items: list[dict], callback_prefix: str, add_skip: bool = False) -> InlineKeyboardMarkup:
+def items_keyboard(
+    items: list[dict], callback_prefix: str, add_skip: bool = False, back_callback: str | None = None,
+) -> InlineKeyboardMarkup:
     buttons = []
     for item in items:
         btn_id = item.get("id", item.get("name", ""))
@@ -17,10 +19,16 @@ def items_keyboard(items: list[dict], callback_prefix: str, add_skip: bool = Fal
         buttons.append([
             InlineKeyboardButton(text="\u23ed Пропустить", callback_data=f"{callback_prefix}:skip")
         ])
+    if back_callback:
+        buttons.append([
+            InlineKeyboardButton(text="\u25c0 Назад", callback_data=back_callback)
+        ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def grades_keyboard(grades: list[int], callback_prefix: str) -> InlineKeyboardMarkup:
+def grades_keyboard(
+    grades: list[int], callback_prefix: str, back_callback: str | None = None,
+) -> InlineKeyboardMarkup:
     buttons = []
     row = []
     for g in grades:
@@ -30,6 +38,10 @@ def grades_keyboard(grades: list[int], callback_prefix: str) -> InlineKeyboardMa
             row = []
     if row:
         buttons.append(row)
+    if back_callback:
+        buttons.append([
+            InlineKeyboardButton(text="\u25c0 Назад", callback_data=back_callback)
+        ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 

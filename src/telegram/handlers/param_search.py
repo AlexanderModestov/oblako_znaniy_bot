@@ -11,6 +11,7 @@ from src.telegram.keyboards import (
     items_keyboard,
     new_search_keyboard,
     pagination_keyboard,
+    search_choice_keyboard,
 )
 
 router = Router()
@@ -23,7 +24,7 @@ async def start_param_search(callback: CallbackQuery, state: FSMContext, session
     await state.update_data(filter={})
     await callback.message.edit_text(
         "Выберите предмет:",
-        reply_markup=items_keyboard(subjects, "ps_subj"),
+        reply_markup=items_keyboard(subjects, "ps_subj", back_callback="ps_back:menu"),
     )
     await callback.answer()
 
@@ -35,7 +36,7 @@ async def select_subject(callback: CallbackQuery, state: FSMContext, session):
     grades = await content_service.get_grades_for_subject(session, subject_id)
     await callback.message.edit_text(
         "Выберите класс:",
-        reply_markup=grades_keyboard(grades, "ps_grade"),
+        reply_markup=grades_keyboard(grades, "ps_grade", back_callback="ps_back:subjects"),
     )
     await callback.answer()
 
@@ -53,7 +54,7 @@ async def select_grade(callback: CallbackQuery, state: FSMContext, session):
         await state.update_data(ps_sections=sections)
         await callback.message.edit_text(
             "Выберите раздел:",
-            reply_markup=items_keyboard(sections, "ps_section", add_skip=True),
+            reply_markup=items_keyboard(sections, "ps_section", add_skip=True, back_callback="ps_back:grades"),
         )
     else:
         await _show_results(callback, state, session)
@@ -83,7 +84,7 @@ async def select_section(callback: CallbackQuery, state: FSMContext, session):
         await state.update_data(ps_topics=topics)
         await callback.message.edit_text(
             "Выберите тему:",
-            reply_markup=items_keyboard(topics, "ps_topic", add_skip=True),
+            reply_markup=items_keyboard(topics, "ps_topic", add_skip=True, back_callback="ps_back:sections"),
         )
     else:
         await _show_results(callback, state, session)
@@ -105,6 +106,63 @@ async def select_topic(callback: CallbackQuery, state: FSMContext, session):
 
     await _show_results(callback, state, session)
     await callback.answer()
+
+
+# --- Back navigation ---
+
+
+@router.callback_query(F.data == "ps_back:menu")
+async def back_to_menu(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.edit_text(
+        "Выберите способ поиска:",
+        reply_markup=search_choice_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "ps_back:subjects")
+async def back_to_subjects(callback: CallbackQuery, state: FSMContext, session):
+    subjects = await content_service.get_subjects(session)
+    await state.update_data(filter={})
+    await callback.message.edit_text(
+        "Выберите предмет:",
+        reply_markup=items_keyboard(subjects, "ps_subj", back_callback="ps_back:menu"),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "ps_back:grades")
+async def back_to_grades(callback: CallbackQuery, state: FSMContext, session):
+    data = await state.get_data()
+    subject_id = data["filter"]["subject_id"]
+    grades = await content_service.get_grades_for_subject(session, subject_id)
+    # Reset grade and below
+    await state.update_data(filter={"subject_id": subject_id})
+    await callback.message.edit_text(
+        "Выберите класс:",
+        reply_markup=grades_keyboard(grades, "ps_grade", back_callback="ps_back:subjects"),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "ps_back:sections")
+async def back_to_sections(callback: CallbackQuery, state: FSMContext, session):
+    data = await state.get_data()
+    filters = data["filter"]
+    sections = await content_service.get_sections(session, filters["subject_id"], filters["grade"])
+    await state.update_data(
+        ps_sections=sections,
+        filter={"subject_id": filters["subject_id"], "grade": filters["grade"]},
+    )
+    await callback.message.edit_text(
+        "Выберите раздел:",
+        reply_markup=items_keyboard(sections, "ps_section", add_skip=True, back_callback="ps_back:grades"),
+    )
+    await callback.answer()
+
+
+# --- Pagination & results ---
 
 
 @router.callback_query(F.data.startswith("ps_results:page:"))

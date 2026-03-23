@@ -11,6 +11,7 @@ from src.max.keyboards import (
     items_keyboard,
     new_search_keyboard,
     pagination_keyboard,
+    search_choice_keyboard,
 )
 
 router = Router(router_id="max_param_search")
@@ -21,7 +22,7 @@ content_service = ContentService()
 async def start_param_search(event: MessageCallback, context: MemoryContext, session):
     subjects = await content_service.get_subjects(session)
     await context.update_data(filter={})
-    kb = items_keyboard(subjects, "ps_subj")
+    kb = items_keyboard(subjects, "ps_subj", back_callback="ps_back:menu")
     await event.bot.edit_message(
         message_id=event.message.body.mid,
         text="Выберите предмет:",
@@ -34,7 +35,7 @@ async def select_subject(event: MessageCallback, context: MemoryContext, session
     subject_id = int(event.callback.payload.split(":")[1])
     await context.update_data(filter={"subject_id": subject_id})
     grades = await content_service.get_grades_for_subject(session, subject_id)
-    kb = grades_keyboard(grades, "ps_grade")
+    kb = grades_keyboard(grades, "ps_grade", back_callback="ps_back:subjects")
     await event.bot.edit_message(
         message_id=event.message.body.mid,
         text="Выберите класс:",
@@ -53,7 +54,7 @@ async def select_grade(event: MessageCallback, context: MemoryContext, session):
     sections = await content_service.get_sections(session, filters["subject_id"], grade)
     if sections:
         await context.update_data(ps_sections=sections)
-        kb = items_keyboard(sections, "ps_section", add_skip=True)
+        kb = items_keyboard(sections, "ps_section", add_skip=True, back_callback="ps_back:grades")
         await event.bot.edit_message(
             message_id=event.message.body.mid,
             text="Выберите раздел:",
@@ -82,7 +83,7 @@ async def select_section(event: MessageCallback, context: MemoryContext, session
     topics = await content_service.get_topics(session, filters["subject_id"], filters["grade"], section_name)
     if topics:
         await context.update_data(ps_topics=topics)
-        kb = items_keyboard(topics, "ps_topic", add_skip=True)
+        kb = items_keyboard(topics, "ps_topic", add_skip=True, back_callback="ps_back:sections")
         await event.bot.edit_message(
             message_id=event.message.body.mid,
             text="Выберите тему:",
@@ -105,6 +106,66 @@ async def select_topic(event: MessageCallback, context: MemoryContext, session):
         await context.update_data(filter=filters)
 
     await _show_results(event, context, session)
+
+
+# --- Back navigation ---
+
+
+@router.message_callback(F.callback.payload == "ps_back:menu")
+async def back_to_menu(event: MessageCallback, context: MemoryContext):
+    await context.clear()
+    kb = search_choice_keyboard()
+    await event.bot.edit_message(
+        message_id=event.message.body.mid,
+        text="Выберите способ поиска:",
+        attachments=[kb.as_markup()],
+    )
+
+
+@router.message_callback(F.callback.payload == "ps_back:subjects")
+async def back_to_subjects(event: MessageCallback, context: MemoryContext, session):
+    subjects = await content_service.get_subjects(session)
+    await context.update_data(filter={})
+    kb = items_keyboard(subjects, "ps_subj", back_callback="ps_back:menu")
+    await event.bot.edit_message(
+        message_id=event.message.body.mid,
+        text="Выберите предмет:",
+        attachments=[kb.as_markup()],
+    )
+
+
+@router.message_callback(F.callback.payload == "ps_back:grades")
+async def back_to_grades(event: MessageCallback, context: MemoryContext, session):
+    data = await context.get_data()
+    subject_id = data["filter"]["subject_id"]
+    grades = await content_service.get_grades_for_subject(session, subject_id)
+    await context.update_data(filter={"subject_id": subject_id})
+    kb = grades_keyboard(grades, "ps_grade", back_callback="ps_back:subjects")
+    await event.bot.edit_message(
+        message_id=event.message.body.mid,
+        text="Выберите класс:",
+        attachments=[kb.as_markup()],
+    )
+
+
+@router.message_callback(F.callback.payload == "ps_back:sections")
+async def back_to_sections(event: MessageCallback, context: MemoryContext, session):
+    data = await context.get_data()
+    filters = data["filter"]
+    sections = await content_service.get_sections(session, filters["subject_id"], filters["grade"])
+    await context.update_data(
+        ps_sections=sections,
+        filter={"subject_id": filters["subject_id"], "grade": filters["grade"]},
+    )
+    kb = items_keyboard(sections, "ps_section", add_skip=True, back_callback="ps_back:grades")
+    await event.bot.edit_message(
+        message_id=event.message.body.mid,
+        text="Выберите раздел:",
+        attachments=[kb.as_markup()],
+    )
+
+
+# --- Pagination & results ---
 
 
 @router.message_callback(F.callback.payload.startswith("ps_results:page:"))

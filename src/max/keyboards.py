@@ -2,21 +2,29 @@ from maxapi.types import CallbackButton
 from maxapi.utils.inline_keyboard import InlineKeyboardBuilder
 
 
-def items_keyboard(items: list[dict], callback_prefix: str, add_skip: bool = False) -> InlineKeyboardBuilder:
+def items_keyboard(
+    items: list[dict], callback_prefix: str, add_skip: bool = False, back_callback: str | None = None,
+) -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
     for item in items:
         btn_id = item.get("id", item.get("name", ""))
         kb.row(CallbackButton(text=item["name"], payload=f"{callback_prefix}:{btn_id}"))
     if add_skip:
         kb.row(CallbackButton(text="\u23ed Пропустить", payload=f"{callback_prefix}:skip"))
+    if back_callback:
+        kb.row(CallbackButton(text="\u25c0 Назад", payload=back_callback))
     return kb
 
 
-def grades_keyboard(grades: list[int], callback_prefix: str) -> InlineKeyboardBuilder:
+def grades_keyboard(
+    grades: list[int], callback_prefix: str, back_callback: str | None = None,
+) -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
     for g in grades:
         kb.add(CallbackButton(text=str(g), payload=f"{callback_prefix}:{g}"))
     kb.adjust(4)
+    if back_callback:
+        kb.row(CallbackButton(text="\u25c0 Назад", payload=back_callback))
     return kb
 
 

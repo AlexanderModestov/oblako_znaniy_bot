@@ -6,7 +6,6 @@ Create Date: 2026-03-23
 """
 
 from alembic import op
-import sqlalchemy as sa
 
 revision = "006"
 down_revision = "d5486c85a6e8"
@@ -15,40 +14,57 @@ depends_on = None
 
 
 def upgrade():
-    # 1. Add new text columns
-    op.add_column("lessons", sa.Column("course", sa.Text(), nullable=True))
-    op.add_column("lessons", sa.Column("section", sa.Text(), nullable=True))
-    op.add_column("lessons", sa.Column("topic", sa.Text(), nullable=True))
-
-    # 2. Copy names from related tables into new columns
+    # Idempotent: add columns only if they don't exist, drop only if they do
     op.execute("""
-        UPDATE lessons l
-        SET course = c.name
-        FROM courses c
-        WHERE l.course_id = c.id
-    """)
-    op.execute("""
-        UPDATE lessons l
-        SET section = s.name
-        FROM sections s
-        WHERE l.section_id = s.id
-    """)
-    op.execute("""
-        UPDATE lessons l
-        SET topic = t.name
-        FROM topics t
-        WHERE l.topic_id = t.id
+        DO $$
+        BEGIN
+            -- Add new text columns
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='lessons' AND column_name='course') THEN
+                ALTER TABLE lessons ADD COLUMN course TEXT;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='lessons' AND column_name='section') THEN
+                ALTER TABLE lessons ADD COLUMN section TEXT;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='lessons' AND column_name='topic') THEN
+                ALTER TABLE lessons ADD COLUMN topic TEXT;
+            END IF;
+
+            -- Copy names from related tables (only if old columns still exist)
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='lessons' AND column_name='course_id') THEN
+                UPDATE lessons l SET course = c.name FROM courses c WHERE l.course_id = c.id AND l.course IS NULL;
+            END IF;
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='lessons' AND column_name='section_id') THEN
+                UPDATE lessons l SET section = s.name FROM sections s WHERE l.section_id = s.id AND l.section IS NULL;
+            END IF;
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='lessons' AND column_name='topic_id') THEN
+                UPDATE lessons l SET topic = t.name FROM topics t WHERE l.topic_id = t.id AND l.topic IS NULL;
+            END IF;
+
+            -- Drop FK constraints (ignore if already dropped)
+            IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='fk_lessons_course_id' AND table_name='lessons') THEN
+                ALTER TABLE lessons DROP CONSTRAINT fk_lessons_course_id;
+            END IF;
+            IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='fk_lessons_section_id' AND table_name='lessons') THEN
+                ALTER TABLE lessons DROP CONSTRAINT fk_lessons_section_id;
+            END IF;
+            IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='fk_lessons_topic_id' AND table_name='lessons') THEN
+                ALTER TABLE lessons DROP CONSTRAINT fk_lessons_topic_id;
+            END IF;
+
+            -- Drop old columns
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='lessons' AND column_name='course_id') THEN
+                ALTER TABLE lessons DROP COLUMN course_id;
+            END IF;
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='lessons' AND column_name='section_id') THEN
+                ALTER TABLE lessons DROP COLUMN section_id;
+            END IF;
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='lessons' AND column_name='topic_id') THEN
+                ALTER TABLE lessons DROP COLUMN topic_id;
+            END IF;
+        END $$;
     """)
 
-    # 3. Drop FK constraints and old columns
-    op.drop_constraint("fk_lessons_course_id", "lessons", type_="foreignkey")
-    op.drop_constraint("fk_lessons_section_id", "lessons", type_="foreignkey")
-    op.drop_constraint("fk_lessons_topic_id", "lessons", type_="foreignkey")
-    op.drop_column("lessons", "course_id")
-    op.drop_column("lessons", "section_id")
-    op.drop_column("lessons", "topic_id")
-
-    # 4. Update search vector trigger to use text columns directly
+    # Update search vector trigger
     op.execute("DROP TRIGGER IF EXISTS lessons_search_vector_trigger ON lessons")
     op.execute("DROP FUNCTION IF EXISTS lessons_search_vector_update")
 
@@ -71,7 +87,7 @@ def upgrade():
             FOR EACH ROW EXECUTE FUNCTION lessons_search_vector_update()
     """)
 
-    # 5. Rebuild search vectors
+    # Rebuild search vectors
     op.execute("""
         UPDATE lessons SET search_vector =
             setweight(to_tsvector('russian', coalesce(title, '')), 'A') ||
@@ -82,17 +98,25 @@ def upgrade():
 
 
 def downgrade():
-    # Restore old columns (without FK)
-    op.add_column("lessons", sa.Column("course_id", sa.Integer(), nullable=True))
-    op.add_column("lessons", sa.Column("section_id", sa.String(50), nullable=True))
-    op.add_column("lessons", sa.Column("topic_id", sa.String(50), nullable=True))
+    op.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='lessons' AND column_name='course_id') THEN
+                ALTER TABLE lessons ADD COLUMN course_id INTEGER;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='lessons' AND column_name='section_id') THEN
+                ALTER TABLE lessons ADD COLUMN section_id VARCHAR(50);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='lessons' AND column_name='topic_id') THEN
+                ALTER TABLE lessons ADD COLUMN topic_id VARCHAR(50);
+            END IF;
 
-    # Drop text columns
-    op.drop_column("lessons", "course")
-    op.drop_column("lessons", "section")
-    op.drop_column("lessons", "topic")
+            ALTER TABLE lessons DROP COLUMN IF EXISTS course;
+            ALTER TABLE lessons DROP COLUMN IF EXISTS section;
+            ALTER TABLE lessons DROP COLUMN IF EXISTS topic;
+        END $$;
+    """)
 
-    # Restore old trigger
     op.execute("DROP TRIGGER IF EXISTS lessons_search_vector_trigger ON lessons")
     op.execute("DROP FUNCTION IF EXISTS lessons_search_vector_update")
 

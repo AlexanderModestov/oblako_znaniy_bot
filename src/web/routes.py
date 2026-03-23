@@ -8,6 +8,7 @@ from src.config import get_settings
 from src.core.database import get_async_session
 from src.core.schemas import UserCreate
 from src.core.services.user import UserService
+from src.telegram.keyboards import search_choice_keyboard
 from src.web.auth import get_platform_user
 
 logger = logging.getLogger(__name__)
@@ -95,18 +96,21 @@ async def register(
             bot = Bot(token=get_settings().bot_token)
             text = (
                 f"Регистрация завершена, {data.full_name}!\n\n"
-                "Просто напишите, что вы ищете, и я найду подходящие уроки."
+                "Выберите способ поиска:"
             )
+            kb = search_choice_keyboard()
             async with bot:
                 if bot_msg_id:
                     await bot.edit_message_text(
                         chat_id=data.telegram_id,
                         message_id=bot_msg_id,
                         text=text,
-                        reply_markup=None,
+                        reply_markup=kb,
                     )
                 else:
-                    await bot.send_message(chat_id=data.telegram_id, text=text)
+                    await bot.send_message(
+                        chat_id=data.telegram_id, text=text, reply_markup=kb
+                    )
         except Exception:
             logger.exception("Failed to send post-registration message")
 
