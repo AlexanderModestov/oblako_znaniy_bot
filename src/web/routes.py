@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_async_session
 from src.core.schemas import UserCreate
 from src.core.services.user import UserService
-from src.web.auth import get_telegram_user
+from src.web.auth import get_platform_user
 
 router = APIRouter(prefix="/api")
 user_service = UserService()
@@ -18,22 +18,29 @@ async def get_session():
 
 @router.post("/auth")
 async def auth(
-    tg_user: dict = Depends(get_telegram_user),
+    user: dict = Depends(get_platform_user),
     session: AsyncSession = Depends(get_session),
 ):
-    telegram_id = tg_user["id"]
-    user = await user_service.get_by_telegram_id(session, telegram_id)
+    platform = user.get("platform", "telegram")
+    user_id = user["id"]
+
+    if platform == "max":
+        db_user = await user_service.get_by_max_user_id(session, user_id)
+    else:
+        db_user = await user_service.get_by_telegram_id(session, user_id)
+
     return {
-        "telegram_id": telegram_id,
-        "status": "existing" if user else "new",
-        "full_name": user.full_name if user else None,
+        "user_id": user_id,
+        "platform": platform,
+        "status": "existing" if db_user else "new",
+        "full_name": db_user.full_name if db_user else None,
     }
 
 
 @router.get("/regions")
 async def regions(
     q: str = Query(default="", max_length=100),
-    tg_user: dict = Depends(get_telegram_user),
+    user: dict = Depends(get_platform_user),
     session: AsyncSession = Depends(get_session),
 ):
     if q:
@@ -45,7 +52,7 @@ async def regions(
 async def schools(
     region_id: int,
     q: str = Query(default="", max_length=100),
-    tg_user: dict = Depends(get_telegram_user),
+    user: dict = Depends(get_platform_user),
     session: AsyncSession = Depends(get_session),
 ):
     if q:
@@ -55,7 +62,7 @@ async def schools(
 
 @router.get("/subjects")
 async def subjects(
-    tg_user: dict = Depends(get_telegram_user),
+    user: dict = Depends(get_platform_user),
     session: AsyncSession = Depends(get_session),
 ):
     return await user_service.get_all_subjects(session)
@@ -64,10 +71,15 @@ async def subjects(
 @router.post("/register")
 async def register(
     data: UserCreate,
-    tg_user: dict = Depends(get_telegram_user),
+    user: dict = Depends(get_platform_user),
     session: AsyncSession = Depends(get_session),
 ):
-    # Ensure telegram_id matches authenticated user
-    data.telegram_id = tg_user["id"]
-    user = await user_service.create_user(session, data)
-    return {"ok": True, "user_id": user.id}
+    platform = user.get("platform", "telegram")
+    if platform == "max":
+        data.max_user_id = user["id"]
+        data.telegram_id = None
+    else:
+        data.telegram_id = user["id"]
+        data.max_user_id = None
+    db_user = await user_service.create_user(session, data)
+    return {"ok": True, "user_id": db_user.id}
