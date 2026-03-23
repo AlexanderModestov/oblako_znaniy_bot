@@ -7,4 +7,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["python", "-m", "src.main"]
+RUN chmod +x start_worker.sh start_web.sh
+
+CMD ["./start_worker.sh"]
