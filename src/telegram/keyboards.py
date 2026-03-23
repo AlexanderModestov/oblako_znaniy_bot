@@ -6,13 +6,6 @@ from aiogram.types import (
 )
 
 
-def main_menu_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="\U0001f50d Поиск по параметрам", callback_data="search_params")],
-        [InlineKeyboardButton(text="\U0001f4ac Поиск по словам", callback_data="search_text")],
-    ])
-
-
 def items_keyboard(items: list[dict], callback_prefix: str, add_skip: bool = False) -> InlineKeyboardMarkup:
     buttons = []
     for item in items:
@@ -92,6 +85,21 @@ def paginated_items_keyboard(
             nav_row.append(InlineKeyboardButton(text="Далее \u25b6", callback_data=f"{callback_prefix}_page:{page + 1}"))
         buttons.append(nav_row)
 
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def search_pagination_keyboard(page: int, total_pages: int) -> InlineKeyboardMarkup:
+    buttons = []
+    nav_row = []
+    if page > 1:
+        nav_row.append(InlineKeyboardButton(text="\u25c0 Назад", callback_data=f"search:page:{page - 1}"))
+    nav_row.append(InlineKeyboardButton(text=f"{page}/{total_pages}", callback_data="noop"))
+    if page < total_pages:
+        nav_row.append(InlineKeyboardButton(text="Далее \u25b6", callback_data=f"search:page:{page + 1}"))
+    buttons.append(nav_row)
+    buttons.append([
+        InlineKeyboardButton(text="\U0001f50d Уточнить по параметрам", callback_data="search_params")
+    ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 

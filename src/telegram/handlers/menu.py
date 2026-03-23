@@ -2,8 +2,6 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
-from src.telegram.keyboards import main_menu_keyboard
-
 router = Router()
 
 
@@ -11,8 +9,7 @@ router = Router()
 async def new_search(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.message.edit_text(
-        "Выберите действие:",
-        reply_markup=main_menu_keyboard(),
+        "Просто напишите, что вы ищете, и я найду подходящие уроки."
     )
     await callback.answer()
 

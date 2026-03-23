@@ -29,7 +29,7 @@ def format_text_results(result: SearchResult) -> str:
     if not result.lessons:
         return (
             f'\U0001f50e По запросу \u00ab{result.query}\u00bb ничего не найдено.\n'
-            "Попробуйте другие ключевые слова или поиск по параметрам."
+            "Попробуйте другие ключевые слова."
         )
     header = f'\U0001f50e По запросу \u00ab{result.query}\u00bb найдено {result.total} результатов:\n\n'
     start_index = (result.page - 1) * result.per_page + 1

@@ -9,7 +9,6 @@ from src.core.services.user import UserService
 from src.telegram.keyboards import (
     contact_keyboard,
     items_keyboard,
-    main_menu_keyboard,
     paginated_items_keyboard,
     skip_keyboard,
     subjects_toggle_keyboard,
@@ -34,8 +33,8 @@ async def cmd_start(message: Message, state: FSMContext, session):
     if user:
         await state.clear()
         await message.answer(
-            f"С возвращением, {user.full_name}! Выберите действие:",
-            reply_markup=main_menu_keyboard(),
+            f"С возвращением, {user.full_name}!\n\n"
+            "Просто напишите, что вы ищете, и я найду подходящие уроки."
         )
         return
     await state.set_state(OnboardingStates.full_name)
@@ -192,6 +191,6 @@ async def _finish_onboarding(message, state: FSMContext, session, telegram_id: i
     await user_service.create_user(session, user_data)
     await state.clear()
     await message.answer(
-        "Регистрация завершена! Выберите действие:",
-        reply_markup=main_menu_keyboard(),
+        "Регистрация завершена!\n\n"
+        "Просто напишите, что вы ищете, и я найду подходящие уроки."
     )
