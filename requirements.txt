@@ -13,3 +13,4 @@ fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
 pytest==8.3.4
 pytest-asyncio==0.25.0
+maxapi>=0.9.17

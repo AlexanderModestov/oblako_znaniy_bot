@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     google_sheets_schools_id: str
     google_service_account_json: str
     openai_api_key: str
+    max_bot_token: str = ""
+    enable_telegram: bool = True
+    enable_max: bool = True
     web_app_url: str = ""
     fts_min_results: int = 3
     semantic_similarity_threshold: float = 0.75
