@@ -14,9 +14,14 @@ class UserService:
         result = await session.execute(select(User).where(User.telegram_id == telegram_id))
         return result.scalar_one_or_none()
 
+    async def get_by_max_user_id(self, session: AsyncSession, max_user_id: int) -> User | None:
+        result = await session.execute(select(User).where(User.max_user_id == max_user_id))
+        return result.scalar_one_or_none()
+
     async def create_user(self, session: AsyncSession, data: UserCreate) -> User:
         user = User(
             telegram_id=data.telegram_id,
+            max_user_id=data.max_user_id,
             full_name=data.full_name,
             phone=data.phone,
             email=data.email,
