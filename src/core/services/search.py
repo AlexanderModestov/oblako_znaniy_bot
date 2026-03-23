@@ -29,7 +29,7 @@ class SearchService:
         offset = (page - 1) * self.per_page
         q = (
             select(Lesson).join(Subject)
-            .options(joinedload(Lesson.section), joinedload(Lesson.topic))
+            .options(joinedload(Lesson.subject), joinedload(Lesson.section), joinedload(Lesson.topic))
             .where(Lesson.search_vector.op("@@")(ts_query))
             .order_by(func.ts_rank(Lesson.search_vector, ts_query).desc())
             .offset(offset).limit(self.per_page)
