@@ -7,7 +7,6 @@ from maxapi.types import BotStarted, MessageCallback, MessageCreated
 from src.core.schemas import UserCreate
 from src.core.services.user import UserService
 from src.max.keyboards import (
-    contact_keyboard,
     paginated_items_keyboard,
     skip_keyboard,
     subjects_toggle_keyboard,
@@ -48,8 +47,8 @@ async def on_bot_started(event: BotStarted, context: MemoryContext, session):
 @router.message_created(F.message.body.text, OnboardingStates.full_name)
 async def process_name(event: MessageCreated, context: MemoryContext, session):
     name = event.message.body.text.strip()
-    if len(name.split()) < 2:
-        await event.message.answer("Пожалуйста, введите имя и фамилию (минимум 2 слова):")
+    if len(name.split()) < 3:
+        await event.message.answer("Введите полное ФИО (Фамилия Имя Отчество):")
         return
     await context.update_data(full_name=name)
     await context.set_state(OnboardingStates.region)
@@ -125,11 +124,9 @@ async def process_subject_toggle(event: MessageCallback, context: MemoryContext)
     if value == "done":
         await context.update_data(subjects=list(selected))
         await context.set_state(OnboardingStates.phone)
-        kb = contact_keyboard()
         await event.bot.edit_message(
             message_id=event.message.body.mid,
-            text="Поделитесь номером телефона (нажмите кнопку или введите вручную):",
-            attachments=[kb.as_markup()],
+            text="Введите номер телефона:",
         )
         return
 
@@ -175,24 +172,29 @@ async def process_email_skip(event: MessageCallback, context: MemoryContext, ses
 
 async def _finish_onboarding(event, context: MemoryContext, session, max_user_id: int):
     data = await context.get_data()
-    user_data = UserCreate(
-        max_user_id=max_user_id,
-        full_name=data["full_name"],
-        phone=data["phone"],
-        email=data.get("email"),
-        region_id=data["region_id"],
-        school_id=data["school_id"],
-        subjects=data.get("subjects", []),
-    )
-    await user_service.create_user(session, user_data)
+    try:
+        user_data = UserCreate(
+            max_user_id=max_user_id,
+            full_name=data["full_name"],
+            phone=data["phone"],
+            email=data.get("email"),
+            region_id=data["region_id"],
+            school_id=data["school_id"],
+            subjects=data.get("subjects", []),
+        )
+        await user_service.create_user(session, user_data)
+    except Exception as e:
+        logger.exception("Failed to create user")
+        error_msg = "Ошибка при регистрации. Попробуйте позже или начните заново /start"
+        if isinstance(event, MessageCreated):
+            await event.message.answer(error_msg)
+        else:
+            await event.answer(new_text=error_msg)
+        return
     await context.clear()
+    success_msg = ("Регистрация завершена!\n\n"
+                   "Просто напишите, что вы ищете, и я найду подходящие уроки.")
     if isinstance(event, MessageCreated):
-        await event.message.answer(
-            "Регистрация завершена!\n\n"
-            "Просто напишите, что вы ищете, и я найду подходящие уроки.",
-        )
+        await event.message.answer(success_msg)
     else:
-        await event.answer(
-            new_text="Регистрация завершена!\n\n"
-                     "Просто напишите, что вы ищете, и я найду подходящие уроки.",
-        )
+        await event.answer(new_text=success_msg)

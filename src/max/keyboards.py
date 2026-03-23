@@ -1,4 +1,4 @@
-from maxapi.types import CallbackButton, RequestContactButton
+from maxapi.types import CallbackButton
 from maxapi.utils.inline_keyboard import InlineKeyboardBuilder
 
 
@@ -77,12 +77,6 @@ def search_pagination_keyboard(page: int, total_pages: int) -> InlineKeyboardBui
         nav_row.append(CallbackButton(text="Далее \u25b6", payload=f"search:page:{page + 1}"))
     kb.row(*nav_row)
     kb.row(CallbackButton(text="\U0001f50d Уточнить по параметрам", payload="search_params"))
-    return kb
-
-
-def contact_keyboard() -> InlineKeyboardBuilder:
-    kb = InlineKeyboardBuilder()
-    kb.row(RequestContactButton(text="\U0001f4f1 Отправить контакт"))
     return kb
 
 

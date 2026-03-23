@@ -21,8 +21,10 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.add_column('users', sa.Column('max_user_id', sa.BigInteger(), nullable=True))
     op.create_unique_constraint('uq_users_max_user_id', 'users', ['max_user_id'])
+    op.alter_column('users', 'telegram_id', nullable=True)
 
 
 def downgrade() -> None:
+    op.alter_column('users', 'telegram_id', nullable=False)
     op.drop_constraint('uq_users_max_user_id', 'users', type_='unique')
     op.drop_column('users', 'max_user_id')
