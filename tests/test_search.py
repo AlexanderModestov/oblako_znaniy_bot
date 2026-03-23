@@ -1,6 +1,6 @@
 from unittest.mock import patch, MagicMock
 
-from src.core.services.search import SearchService
+from src.core.services.search import SearchService, _build_tsquery
 
 
 def _make_mock_settings():
@@ -25,3 +25,17 @@ def test_search_service_default_config(mock_settings):
     service = SearchService()
     assert service.fts_min_results == 3
     assert service.similarity_threshold == 0.75
+
+
+def test_build_tsquery_single_word():
+    expr = _build_tsquery("тангенс")
+    sql = str(expr.compile())
+    assert "plainto_tsquery" in sql
+    assert "websearch_to_tsquery" not in sql
+
+
+def test_build_tsquery_multiple_words():
+    expr = _build_tsquery("тангенс котангенс")
+    sql = str(expr.compile())
+    assert "websearch_to_tsquery" in sql
+    assert "plainto_tsquery" not in sql

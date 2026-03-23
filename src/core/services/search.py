@@ -12,6 +12,14 @@ from src.core.schemas import LessonResult, SearchResult
 logger = logging.getLogger(__name__)
 
 
+def _build_tsquery(query: str):
+    """Build a tsquery expression: single word uses plainto_tsquery, multiple words use OR logic."""
+    words = query.strip().split()
+    if len(words) <= 1:
+        return func.plainto_tsquery("russian", query)
+    return func.websearch_to_tsquery("russian", " OR ".join(words))
+
+
 class SearchService:
     def __init__(self):
         settings = get_settings()
@@ -20,7 +28,7 @@ class SearchService:
         self.per_page = settings.results_per_page
 
     async def fts_search(self, session: AsyncSession, query: str, page: int = 1) -> tuple[list[LessonResult], int]:
-        ts_query = func.plainto_tsquery("russian", query)
+        ts_query = _build_tsquery(query)
 
         count_q = select(func.count(Lesson.id)).where(Lesson.search_vector.op("@@")(ts_query))
         count_result = await session.execute(count_q)
@@ -99,7 +107,7 @@ class SearchService:
         # Not enough FTS results — add semantic search
         # Reuse fts_lessons from the first call (already page 1)
         fts_id_query = select(Lesson.id).where(
-            Lesson.search_vector.op("@@")(func.plainto_tsquery("russian", query))
+            Lesson.search_vector.op("@@")(_build_tsquery(query))
         )
         fts_id_result = await session.execute(fts_id_query)
         exclude_ids = [row[0] for row in fts_id_result.all()]
