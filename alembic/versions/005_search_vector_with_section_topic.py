@@ -74,7 +74,7 @@ def downgrade():
                 setweight(to_tsvector('russian', coalesce(NEW.description, '')), 'B');
             RETURN NEW;
         END;
-        $$ LANGUAGE plpgsql
+        $$ LANGUAGE plpgsql;
     """)
     op.execute("""
         CREATE TRIGGER lessons_search_vector_trigger
