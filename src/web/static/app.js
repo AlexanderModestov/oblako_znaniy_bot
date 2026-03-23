@@ -3,6 +3,8 @@ tg.ready();
 tg.expand();
 
 const initData = tg.initData;
+const urlParams = new URLSearchParams(window.location.search);
+const botMessageId = urlParams.get('msg_id');
 let currentStep = 0;
 const formData = {
     full_name: '',
@@ -358,7 +360,9 @@ async function submitRegistration() {
     tg.MainButton.showProgress();
     tg.MainButton.disable();
     try {
-        await api('POST', '/api/register', {
+        var registerUrl = '/api/register';
+        if (botMessageId) registerUrl += '?bot_msg_id=' + botMessageId;
+        await api('POST', registerUrl, {
             telegram_id: 0,  // Will be overridden by server from auth header
             full_name: formData.full_name,
             region_id: formData.region_id,

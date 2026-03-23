@@ -79,6 +79,7 @@ async def register(
     data: UserCreate,
     user: dict = Depends(get_platform_user),
     session: AsyncSession = Depends(get_session),
+    bot_msg_id: int | None = Query(default=None),
 ):
     platform = user.get("platform", "telegram")
     if platform == "max":
@@ -92,12 +93,20 @@ async def register(
     if platform == "telegram" and data.telegram_id:
         try:
             bot = Bot(token=get_settings().bot_token)
+            text = (
+                f"Регистрация завершена, {data.full_name}!\n\n"
+                "Просто напишите, что вы ищете, и я найду подходящие уроки."
+            )
             async with bot:
-                await bot.send_message(
-                    chat_id=data.telegram_id,
-                    text=f"Регистрация завершена, {data.full_name}!\n\n"
-                         "Просто напишите, что вы ищете, и я найду подходящие уроки.",
-                )
+                if bot_msg_id:
+                    await bot.edit_message_text(
+                        chat_id=data.telegram_id,
+                        message_id=bot_msg_id,
+                        text=text,
+                        reply_markup=None,
+                    )
+                else:
+                    await bot.send_message(chat_id=data.telegram_id, text=text)
         except Exception:
             logger.exception("Failed to send post-registration message")
 

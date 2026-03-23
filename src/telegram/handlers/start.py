@@ -48,16 +48,15 @@ async def cmd_start(message: Message, state: FSMContext, session):
 
     settings = get_settings()
     if settings.web_app_url:
+        # Send message first to get its message_id, then edit to add the button
+        sent = await message.answer("Добро пожаловать! Для начала работы пройдите регистрацию:")
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(
                 text="Зарегистрироваться",
-                web_app=WebAppInfo(url=settings.web_app_url),
+                web_app=WebAppInfo(url=f"{settings.web_app_url}?msg_id={sent.message_id}"),
             )]
         ])
-        await message.answer(
-            "Добро пожаловать! Для начала работы пройдите регистрацию:",
-            reply_markup=keyboard,
-        )
+        await sent.edit_reply_markup(reply_markup=keyboard)
         return
 
     await state.set_state(OnboardingStates.full_name)
