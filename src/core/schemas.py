@@ -46,6 +46,5 @@ class SearchResult(BaseModel):
 class FilterState(BaseModel):
     subject_id: int | None = None
     grade: int | None = None
-    course_id: int | None = None
     section: str | None = None
     topic: str | None = None

@@ -135,9 +135,7 @@ class Lesson(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     url: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    course_id: Mapped[int | None] = mapped_column(
-        ForeignKey("courses.id"), nullable=True
-    )
+    course: Mapped[str | None] = mapped_column(Text, nullable=True)
     section: Mapped[str | None] = mapped_column(Text, nullable=True)
     topic: Mapped[str | None] = mapped_column(Text, nullable=True)
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
@@ -145,7 +143,6 @@ class Lesson(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     subject: Mapped["Subject"] = relationship()
-    course: Mapped["Course | None"] = relationship()
     links: Mapped[list["LessonLink"]] = relationship(back_populates="lesson")
 
 

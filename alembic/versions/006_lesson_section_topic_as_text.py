@@ -1,4 +1,4 @@
-"""Replace section_id/topic_id FK columns with section/topic text columns in lessons.
+"""Replace course_id/section_id/topic_id FK columns with course/section/topic text columns in lessons.
 
 Revision ID: 006
 Revises: d5486c85a6e8
@@ -16,10 +16,17 @@ depends_on = None
 
 def upgrade():
     # 1. Add new text columns
+    op.add_column("lessons", sa.Column("course", sa.Text(), nullable=True))
     op.add_column("lessons", sa.Column("section", sa.Text(), nullable=True))
     op.add_column("lessons", sa.Column("topic", sa.Text(), nullable=True))
 
-    # 2. Copy names from sections/topics tables into new columns
+    # 2. Copy names from related tables into new columns
+    op.execute("""
+        UPDATE lessons l
+        SET course = c.name
+        FROM courses c
+        WHERE l.course_id = c.id
+    """)
     op.execute("""
         UPDATE lessons l
         SET section = s.name
@@ -34,8 +41,10 @@ def upgrade():
     """)
 
     # 3. Drop FK constraints and old columns
+    op.drop_constraint("fk_lessons_course_id", "lessons", type_="foreignkey")
     op.drop_constraint("fk_lessons_section_id", "lessons", type_="foreignkey")
     op.drop_constraint("fk_lessons_topic_id", "lessons", type_="foreignkey")
+    op.drop_column("lessons", "course_id")
     op.drop_column("lessons", "section_id")
     op.drop_column("lessons", "topic_id")
 
@@ -73,19 +82,17 @@ def upgrade():
 
 
 def downgrade():
-    # Restore section_id and topic_id columns
+    # Restore old columns (without FK)
+    op.add_column("lessons", sa.Column("course_id", sa.Integer(), nullable=True))
     op.add_column("lessons", sa.Column("section_id", sa.String(50), nullable=True))
     op.add_column("lessons", sa.Column("topic_id", sa.String(50), nullable=True))
 
-    # Restore FK constraints
-    op.create_foreign_key("lessons_section_id_fkey", "lessons", "sections", ["section_id"], ["id"])
-    op.create_foreign_key("lessons_topic_id_fkey", "lessons", "topics", ["topic_id"], ["id"])
-
     # Drop text columns
+    op.drop_column("lessons", "course")
     op.drop_column("lessons", "section")
     op.drop_column("lessons", "topic")
 
-    # Restore old trigger that looks up names from sections/topics tables
+    # Restore old trigger
     op.execute("DROP TRIGGER IF EXISTS lessons_search_vector_trigger ON lessons")
     op.execute("DROP FUNCTION IF EXISTS lessons_search_vector_update")
 

@@ -388,11 +388,9 @@ async def reload_lessons_data(session: AsyncSession, rows: list[dict]) -> dict:
     """Parse 'Уроки' tab. Full reload: delete all LessonLinks, delete all Lessons, batch insert."""
     logger.info("Processing %d lesson rows...", len(rows))
 
-    # Build lookup maps for FK validation
+    # Build lookup map for subject FK validation
     result = await session.execute(select(Subject))
     subject_map = {s.name: s.id for s in result.scalars().all()}
-    result = await session.execute(select(Course.id))
-    existing_course_ids = {row[0] for row in result.all()}
 
     # Parse rows
     lessons = []
@@ -415,11 +413,6 @@ async def reload_lessons_data(session: AsyncSession, rows: list[dict]) -> dict:
             errors.append(i)
             continue
 
-        # Validate FK references — set to None if not found
-        course_id = _int_or_none(row, "Курс")
-        if course_id and course_id not in existing_course_ids:
-            course_id = None
-
         lessons.append({
             "id": lesson_id,
             "subject_id": subject_id,
@@ -427,7 +420,7 @@ async def reload_lessons_data(session: AsyncSession, rows: list[dict]) -> dict:
             "title": title,
             "url": url,
             "description": _str(row, "Описание урока") or None,
-            "course_id": course_id,
+            "course": _str(row, "Курс") or None,
             "section": _str(row, "Раздел") or None,
             "topic": _str(row, "Тема") or None,
         })
