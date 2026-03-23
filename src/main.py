@@ -19,7 +19,7 @@ async def start_telegram():
     dp.update.middleware(DatabaseMiddleware())
     register_all_routers(dp)
 
-
+    await bot.set_chat_menu_button()  # reset to default
     logger.info("Telegram bot starting polling...")
     await dp.start_polling(bot)
 
