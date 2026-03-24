@@ -10,7 +10,9 @@ router = Router()
 @router.callback_query(F.data == "new_search")
 async def new_search(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    await callback.message.edit_text(
+    # Freeze the old message (remove keyboard), send new one
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.message.answer(
         "Выберите способ поиска:",
         reply_markup=search_choice_keyboard(),
     )
@@ -20,7 +22,9 @@ async def new_search(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "search_text")
 async def search_text(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    await callback.message.edit_text(
+    # Freeze the old message (remove keyboard), send new one
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.message.answer(
         "Просто напишите, что вы ищете, и я найду подходящие уроки."
     )
     await callback.answer()
