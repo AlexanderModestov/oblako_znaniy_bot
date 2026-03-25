@@ -4,7 +4,7 @@ import logging
 import gspread
 from google.oauth2.service_account import Credentials
 from openai import AsyncOpenAI
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +18,7 @@ from src.core.models import (
     Section,
     Subject,
     Topic,
+    User,
 )
 
 logger = logging.getLogger(__name__)
@@ -69,7 +70,7 @@ def _get_gspread_client() -> gspread.Client:
 # Fetch functions (read from Google Sheets)
 # ---------------------------------------------------------------------------
 
-SCHOOL_HEADERS = ["Регион", "municipality", "Наименование муниципалитета", "Школа"]
+SCHOOL_HEADERS = ["Регион", "муниципалитет", "школа", "ИНН"]
 
 
 def _parse_sheet_with_headers(ws, headers: list[str]) -> list[dict]:
@@ -89,28 +90,35 @@ def _parse_sheet_with_headers(ws, headers: list[str]) -> list[dict]:
             "Sheet '%s': unmapped headers %s. Actual headers: %s",
             ws.title, unmapped, actual_headers[:15],
         )
+    # Use first mapped column as row validity check (filters phantom .xlsx rows)
+    first_col_idx = col_map.get(headers[0])
+    raw_count = len(all_values) - 1
     rows = []
     for row_values in all_values[1:]:
+        # Skip rows where the primary column (first header) is empty
+        if first_col_idx is not None and (
+            first_col_idx >= len(row_values) or not row_values[first_col_idx].strip()
+        ):
+            continue
         if not any(v.strip() for v in row_values):
-            continue  # skip empty rows
+            continue
         row = {}
         for header in headers:
             idx = col_map.get(header)
             row[header] = row_values[idx].strip() if idx is not None and idx < len(row_values) else ""
         rows.append(row)
+    if raw_count != len(rows):
+        logger.info("Sheet '%s': %d raw rows, %d after filtering phantom rows", ws.title, raw_count, len(rows))
     return rows
 
 
 def fetch_schools_from_sheets() -> list[dict]:
-    """Open spreadsheet by schools_id, read ALL worksheets EXCEPT the first one."""
+    """Open spreadsheet by schools_id, read first worksheet."""
     settings = get_settings()
     client = _get_gspread_client()
     spreadsheet = client.open_by_key(settings.google_sheets_schools_id)
-    worksheets = spreadsheet.worksheets()
-    all_rows: list[dict] = []
-    for ws in worksheets[1:]:  # skip first worksheet
-        all_rows.extend(_parse_sheet_with_headers(ws, SCHOOL_HEADERS))
-    return all_rows
+    ws = spreadsheet.worksheets()[0]
+    return _parse_sheet_with_headers(ws, SCHOOL_HEADERS)
 
 
 SUBJECT_HEADERS = ["Id", "Name", "Code"]
@@ -163,7 +171,7 @@ async def generate_embeddings(texts: list[str]) -> list[list[float]]:
 # ---------------------------------------------------------------------------
 
 async def reload_schools_data(session: AsyncSession) -> dict:
-    """Parse rows with columns: Регион, municipality, Наименование муниципалитета, Школа."""
+    """Full reload: detach users, delete old schools/regions, insert fresh data."""
     rows = fetch_schools_from_sheets()
 
     regions_set: set[str] = set()
@@ -171,51 +179,62 @@ async def reload_schools_data(session: AsyncSession) -> dict:
 
     for row in rows:
         region = _str(row, "Регион")
-        municipality = _str(row, "municipality") or None
-        municipality_name = _str(row, "Наименование муниципалитета") or None
-        school = _str(row, "Школа")
+        municipality = _str(row, "муниципалитет") or None
+        school = _str(row, "школа")
+        inn = _str(row, "ИНН") or None
         if region:
             regions_set.add(region)
         if region and school:
             schools_list.append({
                 "region": region,
                 "municipality": municipality,
-                "municipality_name": municipality_name,
                 "school": school,
+                "inn": inn,
             })
 
-    # Upsert regions
+    # Detach users from schools/regions, then wipe schools and regions
+    detached = (await session.execute(
+        update(User).where(User.school_id.is_not(None)).values(school_id=None, region_id=None)
+    )).rowcount
+    await session.execute(delete(School))
+    await session.execute(delete(Region))
+    await session.flush()
+    logger.info("Detached %d users from schools/regions", detached)
+
+    # Insert regions
     if regions_set:
-        stmt = pg_insert(Region).values([{"name": n} for n in regions_set])
-        stmt = stmt.on_conflict_do_nothing(index_elements=["name"])
-        await session.execute(stmt)
+        await session.execute(
+            Region.__table__.insert(),
+            [{"name": n} for n in sorted(regions_set)],
+        )
         await session.flush()
 
     result = await session.execute(select(Region))
     region_map = {r.name: r.id for r in result.scalars().all()}
 
-    # Upsert schools
-    school_values = []
+    # Insert schools (deduplicate by region_id + name, last row wins)
+    school_map: dict[tuple, dict] = {}
     for item in schools_list:
         region_id = region_map.get(item["region"])
         if region_id:
-            school_values.append({
+            key = (region_id, item["school"])
+            school_map[key] = {
                 "region_id": region_id,
                 "municipality": item["municipality"],
-                "municipality_name": item["municipality_name"],
                 "name": item["school"],
-            })
+                "inn": item["inn"],
+            }
+    school_values = list(school_map.values())
 
     for i in range(0, len(school_values), BATCH_SIZE):
         batch = school_values[i : i + BATCH_SIZE]
-        stmt = pg_insert(School).values(batch)
-        stmt = stmt.on_conflict_do_nothing(constraint="uq_schools_region_id_name")
-        await session.execute(stmt)
+        await session.execute(School.__table__.insert(), batch)
 
     await session.commit()
     return {
         "regions": len(regions_set),
         "schools": len(school_values),
+        "users_detached": detached,
     }
 
 
@@ -425,7 +444,11 @@ async def reload_lessons_data(session: AsyncSession, rows: list[dict]) -> dict:
             "topic": _str(row, "Тема") or None,
         })
 
-    logger.info("Parsed %d lessons, %d errors", len(lessons), len(errors))
+    # Deduplicate by id (last wins)
+    before_dedup = len(lessons)
+    lessons = list({l["id"]: l for l in lessons}.values())
+
+    logger.info("Parsed %d lessons, %d errors, %d dupes removed", len(lessons), len(errors), before_dedup - len(lessons))
 
     # Delete existing data (LessonLinks first due to FK)
     await session.execute(delete(LessonLink))

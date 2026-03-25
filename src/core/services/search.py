@@ -1,7 +1,7 @@
 import logging
 
 from openai import AsyncOpenAI
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -35,11 +35,12 @@ class SearchService:
         total = count_result.scalar() or 0
 
         offset = (page - 1) * self.per_page
+        na_last = case((Lesson.url == "N/A", 1), else_=0)
         q = (
             select(Lesson)
             .options(joinedload(Lesson.subject))
             .where(Lesson.search_vector.op("@@")(ts_query))
-            .order_by(func.ts_rank(Lesson.search_vector, ts_query).desc())
+            .order_by(na_last, func.ts_rank(Lesson.search_vector, ts_query).desc())
             .offset(offset).limit(self.per_page)
         )
         result = await session.execute(q)

@@ -1,4 +1,4 @@
-from sqlalchemy import distinct, func, select
+from sqlalchemy import case, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -51,11 +51,12 @@ class ContentService:
         if filters.topic:
             base_where.append(Lesson.topic == filters.topic)
 
+        na_last = case((Lesson.url == "N/A", 1), else_=0)
         query = (
             select(Lesson)
             .options(joinedload(Lesson.subject))
             .where(*base_where)
-            .order_by(Lesson.title)
+            .order_by(na_last, Lesson.title)
         )
         result = await session.execute(query)
 
@@ -87,11 +88,12 @@ class ContentService:
         total = count_result.scalar() or 0
 
         offset = (page - 1) * per_page
+        na_last = case((Lesson.url == "N/A", 1), else_=0)
         query = (
             select(Lesson)
             .options(joinedload(Lesson.subject))
             .where(*base_where)
-            .order_by(Lesson.title)
+            .order_by(na_last, Lesson.title)
             .offset(offset)
             .limit(per_page)
         )

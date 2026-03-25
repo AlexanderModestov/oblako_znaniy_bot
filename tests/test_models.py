@@ -31,8 +31,8 @@ def test_region_model():
 def test_school_model():
     assert hasattr(School, "region_id")
     assert hasattr(School, "municipality")
-    assert hasattr(School, "municipality_name")
     assert hasattr(School, "name")
+    assert hasattr(School, "inn")
 
 
 def test_subject_model():

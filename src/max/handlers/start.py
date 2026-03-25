@@ -21,6 +21,7 @@ logger = logging.getLogger("max.start")
 class OnboardingStates(StatesGroup):
     full_name = State()
     region = State()
+    municipality = State()
     school = State()
     subjects = State()
     phone = State()
@@ -78,8 +79,49 @@ async def process_region_page(event: MessageCallback, context: MemoryContext):
 async def process_region_select(event: MessageCallback, context: MemoryContext, session):
     region_id = int(event.callback.payload.split(":")[1])
     await context.update_data(region_id=region_id)
+    municipalities = await user_service.get_municipalities_by_region(session, region_id)
+    if municipalities:
+        await context.set_state(OnboardingStates.municipality)
+        await context.update_data(all_municipalities=municipalities)
+        kb = paginated_items_keyboard(municipalities, "onb_muni")
+        await event.bot.edit_message(
+            message_id=event.message.body.mid,
+            text="Выберите муниципалитет:",
+            attachments=[kb.as_markup()],
+        )
+    else:
+        await context.set_state(OnboardingStates.school)
+        schools = await user_service.get_schools_by_region(session, region_id)
+        await context.update_data(all_schools=schools)
+        kb = paginated_items_keyboard(schools, "onb_school")
+        await event.bot.edit_message(
+            message_id=event.message.body.mid,
+            text="Выберите вашу школу:",
+            attachments=[kb.as_markup()],
+        )
+
+
+@router.message_callback(F.callback.payload.startswith("onb_muni_page:"), OnboardingStates.municipality)
+async def process_municipality_page(event: MessageCallback, context: MemoryContext):
+    page = int(event.callback.payload.split(":")[1])
+    data = await context.get_data()
+    municipalities = data["all_municipalities"]
+    kb = paginated_items_keyboard(municipalities, "onb_muni", page=page)
+    await event.bot.edit_message(
+        message_id=event.message.body.mid,
+        text="Выберите муниципалитет:",
+        attachments=[kb.as_markup()],
+    )
+
+
+@router.message_callback(F.callback.payload.startswith("onb_muni:"), OnboardingStates.municipality)
+async def process_municipality_select(event: MessageCallback, context: MemoryContext, session):
+    muni_idx = int(event.callback.payload.split(":")[1])
+    data = await context.get_data()
+    region_id = data["region_id"]
+    municipality = data["all_municipalities"][muni_idx]["name"]
     await context.set_state(OnboardingStates.school)
-    schools = await user_service.get_schools_by_region(session, region_id)
+    schools = await user_service.get_schools_by_municipality(session, region_id, municipality)
     await context.update_data(all_schools=schools)
     kb = paginated_items_keyboard(schools, "onb_school")
     await event.bot.edit_message(

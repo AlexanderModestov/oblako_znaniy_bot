@@ -45,6 +45,25 @@ class UserService:
         )
         return [{"id": r.id, "name": r.name} for r in result.scalars().all()]
 
+    async def get_municipalities_by_region(self, session: AsyncSession, region_id: int) -> list[dict]:
+        result = await session.execute(
+            select(School.municipality)
+            .where(School.region_id == region_id, School.municipality.isnot(None))
+            .distinct()
+            .order_by(School.municipality)
+        )
+        return [{"id": i, "name": m} for i, m in enumerate(result.scalars().all())]
+
+    async def get_schools_by_municipality(
+        self, session: AsyncSession, region_id: int, municipality: str,
+    ) -> list[dict]:
+        result = await session.execute(
+            select(School)
+            .where(School.region_id == region_id, School.municipality == municipality)
+            .order_by(School.name)
+        )
+        return [{"id": s.id, "name": s.name} for s in result.scalars().all()]
+
     async def get_schools_by_region(self, session: AsyncSession, region_id: int) -> list[dict]:
         result = await session.execute(
             select(School)

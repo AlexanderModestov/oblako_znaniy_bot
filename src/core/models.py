@@ -36,8 +36,8 @@ class School(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     region_id: Mapped[int] = mapped_column(ForeignKey("regions.id"), nullable=False)
     municipality: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    municipality_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    inn: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     region: Mapped["Region"] = relationship(back_populates="schools")
 
@@ -60,7 +60,7 @@ class User(Base):
     phone: Mapped[str] = mapped_column(String(20), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     region_id: Mapped[int] = mapped_column(ForeignKey("regions.id"), nullable=False)
-    school_id: Mapped[int] = mapped_column(ForeignKey("schools.id"), nullable=False)
+    school_id: Mapped[int | None] = mapped_column(ForeignKey("schools.id"), nullable=True)
     subjects: Mapped[list[int]] = mapped_column(ARRAY(SmallInteger), default=list)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())

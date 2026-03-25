@@ -55,6 +55,15 @@ async def regions(
     return await user_service.get_all_regions(session)
 
 
+@router.get("/municipalities/{region_id}")
+async def municipalities(
+    region_id: int,
+    user: dict = Depends(get_platform_user),
+    session: AsyncSession = Depends(get_session),
+):
+    return await user_service.get_municipalities_by_region(session, region_id)
+
+
 @router.get("/schools/{region_id}")
 async def schools(
     region_id: int,

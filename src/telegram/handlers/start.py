@@ -30,6 +30,7 @@ user_service = UserService()
 class OnboardingStates(StatesGroup):
     full_name = State()
     region = State()
+    municipality = State()
     school = State()
     subjects = State()
     phone = State()
@@ -99,8 +100,44 @@ async def process_region_page(callback: CallbackQuery, state: FSMContext):
 async def process_region_select(callback: CallbackQuery, state: FSMContext, session):
     region_id = int(callback.data.split(":")[1])
     await state.update_data(region_id=region_id)
+    municipalities = await user_service.get_municipalities_by_region(session, region_id)
+    if municipalities:
+        await state.set_state(OnboardingStates.municipality)
+        await state.update_data(all_municipalities=municipalities)
+        await callback.message.edit_text(
+            "Выберите муниципалитет:",
+            reply_markup=paginated_items_keyboard(municipalities, "onb_muni"),
+        )
+    else:
+        await state.set_state(OnboardingStates.school)
+        schools = await user_service.get_schools_by_region(session, region_id)
+        await state.update_data(all_schools=schools)
+        await callback.message.edit_text(
+            "Выберите вашу школу:",
+            reply_markup=paginated_items_keyboard(schools, "onb_school"),
+        )
+    await callback.answer()
+
+
+@router.callback_query(OnboardingStates.municipality, F.data.startswith("onb_muni_page:"))
+async def process_municipality_page(callback: CallbackQuery, state: FSMContext):
+    page = int(callback.data.split(":")[1])
+    data = await state.get_data()
+    municipalities = data["all_municipalities"]
+    await callback.message.edit_reply_markup(
+        reply_markup=paginated_items_keyboard(municipalities, "onb_muni", page=page),
+    )
+    await callback.answer()
+
+
+@router.callback_query(OnboardingStates.municipality, F.data.startswith("onb_muni:"))
+async def process_municipality_select(callback: CallbackQuery, state: FSMContext, session):
+    muni_idx = int(callback.data.split(":")[1])
+    data = await state.get_data()
+    region_id = data["region_id"]
+    municipality = data["all_municipalities"][muni_idx]["name"]
     await state.set_state(OnboardingStates.school)
-    schools = await user_service.get_schools_by_region(session, region_id)
+    schools = await user_service.get_schools_by_municipality(session, region_id, municipality)
     await state.update_data(all_schools=schools)
     await callback.message.edit_text(
         "Выберите вашу школу:",

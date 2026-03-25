@@ -1,10 +1,18 @@
 from src.core.schemas import LessonResult, SearchResult
 
+_IN_DEVELOPMENT = "\u23f3 На данный момент урок находится в разработке, добавим его чуть позже"
+
+
+def _url_line(url: str, indent: str = "") -> str:
+    if url == "N/A":
+        return f"{indent}{_IN_DEVELOPMENT}"
+    return f"{indent}\u2192 {url}"
+
 
 def format_lesson_param(lesson: LessonResult) -> str:
     return (
         f"\U0001f4da {lesson.title}\n"
-        f"\u2192 {lesson.url}"
+        f"{_url_line(lesson.url)}"
     )
 
 
@@ -15,7 +23,7 @@ def format_lesson_text(lesson: LessonResult, index: int) -> str:
     return (
         f"{index}. {semantic_mark}{context}\n"
         f"   \U0001f4da {lesson.title}\n"
-        f"   \u2192 {lesson.url}"
+        f"{_url_line(lesson.url, '   ')}"
     )
 
 
@@ -32,7 +40,7 @@ def format_topic_lessons(lessons: list[LessonResult]) -> str:
     parts = [p for p in [first.subject, first.section, first.topic] if p]
     header = " | ".join(parts)
     items = "\n\n".join(
-        f"{i}. \U0001f4da {l.title}\n   \u2192 {l.url}"
+        f"{i}. \U0001f4da {l.title}\n{_url_line(l.url, '   ')}"
         for i, l in enumerate(lessons, 1)
     )
     return f"\U0001f4cb {header}\n\nУроки ({len(lessons)}):\n\n{items}"
