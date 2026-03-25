@@ -68,11 +68,14 @@ async def municipalities(
 async def schools(
     region_id: int,
     q: str = Query(default="", max_length=100),
+    municipality: str = Query(default="", max_length=255),
     user: dict = Depends(get_platform_user),
     session: AsyncSession = Depends(get_session),
 ):
     if q:
         return await user_service.search_schools(session, region_id, q, limit=50)
+    if municipality:
+        return await user_service.get_schools_by_municipality(session, region_id, municipality)
     return await user_service.get_schools_by_region(session, region_id)
 
 

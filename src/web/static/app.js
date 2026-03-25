@@ -9,6 +9,7 @@ let currentStep = 0;
 const formData = {
     full_name: '',
     region_id: null,
+    municipality: null,
     school_id: null,
     subjects: [],
     phone: '',
@@ -30,12 +31,15 @@ const $steps = {
     4: document.getElementById('step-4'),
     5: document.getElementById('step-5'),
     6: document.getElementById('step-6'),
+    7: document.getElementById('step-7'),
 };
 
 const $inputName = document.getElementById('input-name');
 const $errorName = document.getElementById('error-name');
 const $searchRegion = document.getElementById('search-region');
 const $listRegion = document.getElementById('list-region');
+const $searchMunicipality = document.getElementById('search-municipality');
+const $listMunicipality = document.getElementById('list-municipality');
 const $searchSchool = document.getElementById('search-school');
 const $listSchool = document.getElementById('list-school');
 const $listSubjects = document.getElementById('list-subjects');
@@ -44,6 +48,9 @@ const $errorPhone = document.getElementById('error-phone');
 const $inputEmail = document.getElementById('input-email');
 const $errorEmail = document.getElementById('error-email');
 const $btnSkip = document.getElementById('btn-skip');
+
+// Municipality data cached from API
+var municipalitiesData = [];
 
 // ===== API Helper =====
 async function api(method, url, body) {
@@ -84,7 +91,7 @@ function hideAll() {
     $welcome.classList.add('hidden');
     $success.classList.add('hidden');
     $progressBar.classList.add('hidden');
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= 7; i++) {
         $steps[i].classList.remove('active');
     }
 }
@@ -128,10 +135,10 @@ function showStep(n) {
     if (n === 1) {
         tg.MainButton.setText('Далее');
         tg.MainButton.show();
-    } else if (n === 2 || n === 3) {
+    } else if (n === 2 || n === 3 || n === 4) {
         // Selection-based, no MainButton
         tg.MainButton.hide();
-    } else if (n === 4) {
+    } else if (n === 5) {
         tg.MainButton.setText('Готово');
         // Show only if at least 1 subject selected
         if (formData.subjects.length > 0) {
@@ -139,10 +146,10 @@ function showStep(n) {
         } else {
             tg.MainButton.hide();
         }
-    } else if (n === 5) {
+    } else if (n === 6) {
         tg.MainButton.setText('Далее');
         tg.MainButton.show();
-    } else if (n === 6) {
+    } else if (n === 7) {
         tg.MainButton.setText('Готово');
         tg.MainButton.show();
     }
@@ -152,9 +159,12 @@ function showStep(n) {
         $searchRegion.value = '';
         loadRegions('');
     } else if (n === 3) {
+        $searchMunicipality.value = '';
+        loadMunicipalities('');
+    } else if (n === 4) {
         $searchSchool.value = '';
         loadSchools('');
-    } else if (n === 4) {
+    } else if (n === 5) {
         loadSubjects();
     }
 }
@@ -217,15 +227,65 @@ var debouncedRegionSearch = debounce(function () {
 
 $searchRegion.addEventListener('input', debouncedRegionSearch);
 
-// ===== Step 3: Schools =====
+// ===== Step 3: Municipalities =====
+async function loadMunicipalities(query) {
+    try {
+        var url = '/api/municipalities/' + formData.region_id;
+        var data = await api('GET', url);
+        municipalitiesData = data;
+        var filtered = data;
+        if (query) {
+            var q = query.toLowerCase();
+            filtered = data.filter(function (item) {
+                return item.name.toLowerCase().indexOf(q) !== -1;
+            });
+        }
+        if (filtered.length === 0 && !query) {
+            // No municipalities for this region, skip to school
+            showStep(4);
+            return;
+        }
+        renderList($listMunicipality, filtered, function (item) {
+            formData.municipality = item.name;
+            showStep(4);
+        });
+    } catch (err) {
+        $listMunicipality.innerHTML = '<div class="list-empty">Ошибка загрузки. Попробуйте ещё раз.</div>';
+    }
+}
+
+var debouncedMunicipalitySearch = debounce(function () {
+    var query = $searchMunicipality.value.trim();
+    if (municipalitiesData.length > 0) {
+        // Filter locally since we already have all data
+        var filtered = municipalitiesData;
+        if (query) {
+            var q = query.toLowerCase();
+            filtered = municipalitiesData.filter(function (item) {
+                return item.name.toLowerCase().indexOf(q) !== -1;
+            });
+        }
+        renderList($listMunicipality, filtered, function (item) {
+            formData.municipality = item.name;
+            showStep(4);
+        });
+    } else {
+        loadMunicipalities(query);
+    }
+}, 300);
+
+$searchMunicipality.addEventListener('input', debouncedMunicipalitySearch);
+
+// ===== Step 4: Schools =====
 async function loadSchools(query) {
     try {
         var url = '/api/schools/' + formData.region_id;
         if (query) url += '?q=' + encodeURIComponent(query);
+        if (!query && formData.municipality) url += '?municipality=' + encodeURIComponent(formData.municipality);
         var data = await api('GET', url);
         renderList($listSchool, data, function (item) {
             formData.school_id = item.id;
-            showStep(4);
+            showStep(5);
         });
     } catch (err) {
         $listSchool.innerHTML = '<div class="list-empty">Ошибка загрузки. Попробуйте ещё раз.</div>';
@@ -238,7 +298,7 @@ var debouncedSchoolSearch = debounce(function () {
 
 $searchSchool.addEventListener('input', debouncedSchoolSearch);
 
-// ===== Step 4: Subjects =====
+// ===== Step 5: Subjects =====
 var subjectsLoaded = false;
 
 async function loadSubjects() {
@@ -310,12 +370,12 @@ function updateSubjectSelection() {
     }
 }
 
-function handleStep4() {
+function handleStep5() {
     if (formData.subjects.length === 0) return;
-    showStep(5);
+    showStep(6);
 }
 
-// ===== Step 5: Phone =====
+// ===== Step 6: Phone =====
 function validatePhone() {
     var val = $inputPhone.value.trim().replace(/[\s\-\(\)]/g, '');
     if (!/^\+7\d{10}$/.test(val)) {
@@ -326,13 +386,13 @@ function validatePhone() {
     return true;
 }
 
-function handleStep5() {
+function handleStep6() {
     if (!validatePhone()) return;
     formData.phone = $inputPhone.value.trim();
-    showStep(6);
+    showStep(7);
 }
 
-// ===== Step 6: Email =====
+// ===== Step 7: Email =====
 function validateEmail() {
     var val = $inputEmail.value.trim();
     if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
@@ -343,7 +403,7 @@ function validateEmail() {
     return true;
 }
 
-function handleStep6() {
+function handleStep7() {
     if (!validateEmail()) return;
     var val = $inputEmail.value.trim();
     formData.email = val || null;
@@ -390,9 +450,9 @@ async function submitRegistration() {
 function handleMainButton() {
     switch (currentStep) {
         case 1: handleStep1(); break;
-        case 4: handleStep4(); break;
         case 5: handleStep5(); break;
         case 6: handleStep6(); break;
+        case 7: handleStep7(); break;
     }
 }
 
@@ -401,7 +461,12 @@ tg.MainButton.onClick(handleMainButton);
 // ===== BackButton Handler =====
 function handleBack() {
     if (currentStep > 1) {
-        showStep(currentStep - 1);
+        // If going back from school (step 4) and no municipalities exist, skip to region (step 2)
+        if (currentStep === 4 && municipalitiesData.length === 0) {
+            showStep(2);
+        } else {
+            showStep(currentStep - 1);
+        }
     }
 }
 
