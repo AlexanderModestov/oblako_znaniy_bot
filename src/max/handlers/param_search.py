@@ -1,6 +1,7 @@
 from maxapi import F, Router
 from maxapi.context import MemoryContext
 from maxapi.types import MessageCallback
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
 from src.core.schemas import FilterState
@@ -19,7 +20,7 @@ content_service = ContentService()
 
 
 @router.message_callback(F.callback.payload == "search_curriculum")
-async def start_param_search(event: MessageCallback, context: MemoryContext, session):
+async def start_param_search(event: MessageCallback, context: MemoryContext, session: AsyncSession):
     subjects = await content_service.get_subjects(session)
     await context.update_data(filter={})
     kb = items_keyboard(subjects, "ps_subj", back_callback="ps_back:menu")
@@ -31,7 +32,7 @@ async def start_param_search(event: MessageCallback, context: MemoryContext, ses
 
 
 @router.message_callback(F.callback.payload.startswith("ps_subj:"))
-async def select_subject(event: MessageCallback, context: MemoryContext, session):
+async def select_subject(event: MessageCallback, context: MemoryContext, session: AsyncSession):
     subject_id = int(event.callback.payload.split(":")[1])
     await context.update_data(filter={"subject_id": subject_id})
     grades = await content_service.get_grades_for_subject(session, subject_id)
@@ -44,7 +45,7 @@ async def select_subject(event: MessageCallback, context: MemoryContext, session
 
 
 @router.message_callback(F.callback.payload.startswith("ps_grade:"))
-async def select_grade(event: MessageCallback, context: MemoryContext, session):
+async def select_grade(event: MessageCallback, context: MemoryContext, session: AsyncSession):
     grade = int(event.callback.payload.split(":")[1])
     data = await context.get_data()
     filters = data["filter"]
@@ -61,17 +62,17 @@ async def select_grade(event: MessageCallback, context: MemoryContext, session):
             attachments=[kb.as_markup()],
         )
     else:
-        await _show_results(event, context, session)
+        await _show_results(event, context, session: AsyncSession)
 
 
 @router.message_callback(F.callback.payload.startswith("ps_section:"))
-async def select_section(event: MessageCallback, context: MemoryContext, session):
+async def select_section(event: MessageCallback, context: MemoryContext, session: AsyncSession):
     value = event.callback.payload.split(":")[1]
     data = await context.get_data()
     filters = data["filter"]
 
     if value == "skip":
-        await _show_results(event, context, session)
+        await _show_results(event, context, session: AsyncSession)
         return
 
     # Look up section name by index
@@ -90,11 +91,11 @@ async def select_section(event: MessageCallback, context: MemoryContext, session
             attachments=[kb.as_markup()],
         )
     else:
-        await _show_results(event, context, session)
+        await _show_results(event, context, session: AsyncSession)
 
 
 @router.message_callback(F.callback.payload.startswith("ps_topic:"))
-async def select_topic(event: MessageCallback, context: MemoryContext, session):
+async def select_topic(event: MessageCallback, context: MemoryContext, session: AsyncSession):
     value = event.callback.payload.split(":")[1]
     data = await context.get_data()
     filters = data["filter"]
@@ -105,7 +106,7 @@ async def select_topic(event: MessageCallback, context: MemoryContext, session):
         filters["topic"] = topics[int(value)]["name"]
         await context.update_data(filter=filters)
 
-    await _show_results(event, context, session)
+    await _show_results(event, context, session: AsyncSession)
 
 
 # --- Back navigation ---
@@ -123,7 +124,7 @@ async def back_to_menu(event: MessageCallback, context: MemoryContext):
 
 
 @router.message_callback(F.callback.payload == "ps_back:subjects")
-async def back_to_subjects(event: MessageCallback, context: MemoryContext, session):
+async def back_to_subjects(event: MessageCallback, context: MemoryContext, session: AsyncSession):
     subjects = await content_service.get_subjects(session)
     await context.update_data(filter={})
     kb = items_keyboard(subjects, "ps_subj", back_callback="ps_back:menu")
@@ -135,7 +136,7 @@ async def back_to_subjects(event: MessageCallback, context: MemoryContext, sessi
 
 
 @router.message_callback(F.callback.payload == "ps_back:grades")
-async def back_to_grades(event: MessageCallback, context: MemoryContext, session):
+async def back_to_grades(event: MessageCallback, context: MemoryContext, session: AsyncSession):
     data = await context.get_data()
     subject_id = data["filter"]["subject_id"]
     grades = await content_service.get_grades_for_subject(session, subject_id)
@@ -149,7 +150,7 @@ async def back_to_grades(event: MessageCallback, context: MemoryContext, session
 
 
 @router.message_callback(F.callback.payload == "ps_back:sections")
-async def back_to_sections(event: MessageCallback, context: MemoryContext, session):
+async def back_to_sections(event: MessageCallback, context: MemoryContext, session: AsyncSession):
     data = await context.get_data()
     filters = data["filter"]
     sections = await content_service.get_sections(session, filters["subject_id"], filters["grade"])
@@ -169,7 +170,7 @@ async def back_to_sections(event: MessageCallback, context: MemoryContext, sessi
 
 
 @router.message_callback(F.callback.payload.startswith("ps_results:page:"))
-async def paginate_results(event: MessageCallback, context: MemoryContext, session):
+async def paginate_results(event: MessageCallback, context: MemoryContext, session: AsyncSession):
     page = int(event.callback.payload.split(":")[-1])
     await _show_results(event, context, session, page=page)
 

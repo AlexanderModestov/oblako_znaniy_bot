@@ -3,6 +3,7 @@ import logging
 
 from maxapi import Router
 from maxapi.types import Command, MessageCreated
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
 from src.core.services.loader import (
@@ -31,7 +32,7 @@ def _short_error(e: Exception) -> str:
 
 
 @router.message_created(Command("reload"))
-async def cmd_reload(event: MessageCreated, session):
+async def cmd_reload(event: MessageCreated, session: AsyncSession):
     user_id = event.message.sender.user_id
     logger.info("Reload requested by max_user_id=%s", user_id)
     if not is_admin(user_id):
@@ -120,7 +121,7 @@ async def cmd_reload(event: MessageCreated, session):
 
 
 @router.message_created(Command("stats"))
-async def cmd_stats(event: MessageCreated, session):
+async def cmd_stats(event: MessageCreated, session: AsyncSession):
     if not is_admin(event.message.sender.user_id):
         return
     user_count = await user_service.get_user_count(session)

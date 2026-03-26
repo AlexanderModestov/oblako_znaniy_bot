@@ -4,6 +4,8 @@ from maxapi import F, Router
 from maxapi.context import MemoryContext, State, StatesGroup
 from maxapi.types import BotStarted, MessageCallback, MessageCreated
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.core.schemas import UserCreate
 from src.core.services.user import UserService
 from src.max.keyboards import (
@@ -29,7 +31,7 @@ class OnboardingStates(StatesGroup):
 
 
 @router.bot_started()
-async def on_bot_started(event: BotStarted, context: MemoryContext, session):
+async def on_bot_started(event: BotStarted, context: MemoryContext, session: AsyncSession):
     user = await user_service.get_by_max_user_id(session, event.user.user_id)
     if user:
         kb = search_choice_keyboard()
@@ -49,7 +51,7 @@ async def on_bot_started(event: BotStarted, context: MemoryContext, session):
 
 
 @router.message_created(F.message.body.text, OnboardingStates.full_name)
-async def process_name(event: MessageCreated, context: MemoryContext, session):
+async def process_name(event: MessageCreated, context: MemoryContext, session: AsyncSession):
     name = event.message.body.text.strip()
     if len(name.split()) < 3:
         await event.message.answer("Введите полное ФИО (Фамилия Имя Отчество):")
@@ -76,7 +78,7 @@ async def process_region_page(event: MessageCallback, context: MemoryContext):
 
 
 @router.message_callback(F.callback.payload.startswith("onb_region:"), OnboardingStates.region)
-async def process_region_select(event: MessageCallback, context: MemoryContext, session):
+async def process_region_select(event: MessageCallback, context: MemoryContext, session: AsyncSession):
     region_id = int(event.callback.payload.split(":")[1])
     await context.update_data(region_id=region_id)
     municipalities = await user_service.get_municipalities_by_region(session, region_id)
@@ -115,7 +117,7 @@ async def process_municipality_page(event: MessageCallback, context: MemoryConte
 
 
 @router.message_callback(F.callback.payload.startswith("onb_muni:"), OnboardingStates.municipality)
-async def process_municipality_select(event: MessageCallback, context: MemoryContext, session):
+async def process_municipality_select(event: MessageCallback, context: MemoryContext, session: AsyncSession):
     muni_idx = int(event.callback.payload.split(":")[1])
     data = await context.get_data()
     region_id = data["region_id"]
@@ -145,7 +147,7 @@ async def process_school_page(event: MessageCallback, context: MemoryContext):
 
 
 @router.message_callback(F.callback.payload.startswith("onb_school:"), OnboardingStates.school)
-async def process_school_select(event: MessageCallback, context: MemoryContext, session):
+async def process_school_select(event: MessageCallback, context: MemoryContext, session: AsyncSession):
     school_id = int(event.callback.payload.split(":")[1])
     await context.update_data(school_id=school_id)
     await context.set_state(OnboardingStates.subjects)
@@ -205,13 +207,13 @@ async def process_phone_text(event: MessageCreated, context: MemoryContext):
 
 
 @router.message_created(F.message.body.text, OnboardingStates.email)
-async def process_email(event: MessageCreated, context: MemoryContext, session):
+async def process_email(event: MessageCreated, context: MemoryContext, session: AsyncSession):
     await context.update_data(email=event.message.body.text.strip())
     await _finish_onboarding(event, context, session, max_user_id=event.message.sender.user_id)
 
 
 @router.message_callback(F.callback.payload == "onb_skip", OnboardingStates.email)
-async def process_email_skip(event: MessageCallback, context: MemoryContext, session):
+async def process_email_skip(event: MessageCallback, context: MemoryContext, session: AsyncSession):
     await _finish_onboarding(event, context, session, max_user_id=event.callback.user.user_id)
 
 

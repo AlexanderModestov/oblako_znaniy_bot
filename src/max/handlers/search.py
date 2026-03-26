@@ -1,6 +1,7 @@
 from maxapi import F, Router
 from maxapi.context import MemoryContext
 from maxapi.types import MessageCallback, MessageCreated
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.services.search import SearchService
 from src.core.services.user import UserService
@@ -13,7 +14,7 @@ user_service = UserService()
 
 
 @router.message_created(F.message.body.text)
-async def handle_search(event: MessageCreated, context: MemoryContext, session):
+async def handle_search(event: MessageCreated, context: MemoryContext, session: AsyncSession):
     """Catch-all: any text message from registered user triggers search."""
     user = await user_service.get_by_max_user_id(session, event.message.sender.user_id)
     if not user:
@@ -40,7 +41,7 @@ async def handle_search(event: MessageCreated, context: MemoryContext, session):
 
 
 @router.message_callback(F.callback.payload.startswith("search:page:"))
-async def paginate_search(event: MessageCallback, context: MemoryContext, session):
+async def paginate_search(event: MessageCallback, context: MemoryContext, session: AsyncSession):
     page = int(event.callback.payload.split(":")[-1])
     data = await context.get_data()
     query = data.get("search_query", "")
