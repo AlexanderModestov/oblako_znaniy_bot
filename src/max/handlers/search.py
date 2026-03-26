@@ -28,7 +28,7 @@ async def handle_search(event: MessageCreated, context: MemoryContext, session: 
             )
         else:
             await event.message.answer(
-                "Вы ещё не зарегистрированы. Нажмите «Начать» для регистрации."
+                "Вы ещё не зарегистрированы. Нажмите /start для регистрации."
             )
         return
 

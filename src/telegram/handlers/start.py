@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import F, Router
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
@@ -25,6 +27,7 @@ from src.telegram.keyboards import (
 
 router = Router()
 user_service = UserService()
+logger = logging.getLogger(__name__)
 
 
 class OnboardingStates(StatesGroup):
@@ -51,15 +54,16 @@ async def cmd_start(message: Message, state: FSMContext, session):
 
     settings = get_settings()
     if settings.web_app_url:
-        # Send message first to get its message_id, then edit to add the button
-        sent = await message.answer("Добро пожаловать! Для начала работы пройдите регистрацию:")
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(
                 text="Зарегистрироваться",
-                web_app=WebAppInfo(url=f"{settings.web_app_url}?msg_id={sent.message_id}"),
+                web_app=WebAppInfo(url=settings.web_app_url),
             )]
         ])
-        await sent.edit_reply_markup(reply_markup=keyboard)
+        await message.answer(
+            "Добро пожаловать! Для начала работы пройдите регистрацию:",
+            reply_markup=keyboard,
+        )
         return
 
     await state.set_state(OnboardingStates.full_name)
@@ -243,17 +247,21 @@ async def process_email_skip(callback: CallbackQuery, state: FSMContext, session
 
 async def _finish_onboarding(message, state: FSMContext, session, telegram_id: int):
     data = await state.get_data()
-    tid = telegram_id
-    user_data = UserCreate(
-        telegram_id=tid,
-        full_name=data["full_name"],
-        phone=data["phone"],
-        email=data.get("email"),
-        region_id=data["region_id"],
-        school_id=data["school_id"],
-        subjects=data.get("subjects", []),
-    )
-    await user_service.create_user(session, user_data)
+    try:
+        user_data = UserCreate(
+            telegram_id=telegram_id,
+            full_name=data["full_name"],
+            phone=data["phone"],
+            email=data.get("email"),
+            region_id=data["region_id"],
+            school_id=data["school_id"],
+            subjects=data.get("subjects", []),
+        )
+        await user_service.create_user(session, user_data)
+    except Exception:
+        logger.exception("Failed to create user")
+        await message.answer("Ошибка при регистрации. Попробуйте позже или начните заново /start")
+        return
     await state.clear()
     await message.answer(
         "Регистрация завершена!\n\n"

@@ -8,7 +8,6 @@ from aiogram.types import Message
 from src.config import get_settings
 from src.core.services.loader import (
     fetch_all_content_from_sheets,
-    fetch_schools_from_sheets,
     reload_courses_data,
     reload_lesson_links_data,
     reload_lessons_data,

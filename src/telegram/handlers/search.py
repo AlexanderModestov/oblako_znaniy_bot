@@ -1,7 +1,14 @@
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+    WebAppInfo,
+)
 
+from src.config import get_settings
 from src.core.services.search import SearchService
 from src.core.services.user import UserService
 from src.telegram.formatters import format_text_results
@@ -17,9 +24,22 @@ async def handle_search(message: Message, state: FSMContext, session):
     """Catch-all: any text message from registered user triggers search."""
     user = await user_service.get_by_telegram_id(session, message.from_user.id)
     if not user:
-        await message.answer(
-            "Вы ещё не зарегистрированы. Нажмите /start для регистрации."
-        )
+        settings = get_settings()
+        if settings.web_app_url:
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="Зарегистрироваться",
+                    web_app=WebAppInfo(url=settings.web_app_url),
+                )]
+            ])
+            await message.answer(
+                "Вы ещё не зарегистрированы. Пройдите регистрацию:",
+                reply_markup=keyboard,
+            )
+        else:
+            await message.answer(
+                "Вы ещё не зарегистрированы. Нажмите /start для регистрации."
+            )
         return
 
     query = message.text.strip()

@@ -36,6 +36,7 @@ class OnboardingStates(StatesGroup):
 async def on_bot_started(event: BotStarted, context: MemoryContext, session: AsyncSession):
     user = await user_service.get_by_max_user_id(session, event.user.user_id)
     if user:
+        await context.clear()
         kb = search_choice_keyboard()
         await event.bot.send_message(
             chat_id=event.chat_id,
@@ -57,7 +58,7 @@ async def on_bot_started(event: BotStarted, context: MemoryContext, session: Asy
     await event.bot.send_message(
         chat_id=event.chat_id,
         text="Добро пожаловать! Давайте зарегистрируемся.\n\n"
-             "Введите Ваше ФИО:",
+             "Введите ваше ФИО (Фамилия Имя Отчество) одним сообщением:",
     )
 
 
@@ -65,7 +66,7 @@ async def on_bot_started(event: BotStarted, context: MemoryContext, session: Asy
 async def process_name(event: MessageCreated, context: MemoryContext, session: AsyncSession):
     name = event.message.body.text.strip()
     if len(name.split()) < 3:
-        await event.message.answer("Введите полное ФИО (Фамилия Имя Отчество):")
+        await event.message.answer("Пожалуйста, введите полное ФИО (Фамилия Имя Отчество) одним сообщением:")
         return
     await context.update_data(full_name=name)
     await context.set_state(OnboardingStates.region)
@@ -184,7 +185,7 @@ async def process_subject_toggle(event: MessageCallback, context: MemoryContext)
         await context.set_state(OnboardingStates.phone)
         await event.bot.edit_message(
             message_id=event.message.body.mid,
-            text="Введите номер телефона:",
+            text="Поделитесь номером телефона:\n\nВведите номер вручную в формате +7XXXXXXXXXX:",
         )
         return
 
@@ -209,6 +210,7 @@ async def process_phone_text(event: MessageCreated, context: MemoryContext):
         await event.message.answer("Введите номер в формате +7XXXXXXXXXX:")
         return
     await context.update_data(phone=phone)
+    await event.message.answer("Номер получен.")
     await context.set_state(OnboardingStates.email)
     kb = skip_keyboard()
     await event.message.answer(
