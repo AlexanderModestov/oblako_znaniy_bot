@@ -78,12 +78,15 @@ def _parse_sheet_with_headers(ws, headers: list[str]) -> list[dict]:
     all_values = ws.get_all_values()
     if not all_values:
         return []
-    # Read actual headers from first row and find column indices
+    # Read actual headers from first row and find column indices (case-insensitive)
     actual_headers = [h.strip() for h in all_values[0]]
+    actual_lower = [h.lower() for h in actual_headers]
     col_map = {}  # header_name -> column_index
     for header in headers:
-        if header in actual_headers:
-            col_map[header] = actual_headers.index(header)
+        try:
+            col_map[header] = actual_lower.index(header.lower())
+        except ValueError:
+            pass
     unmapped = [h for h in headers if h not in col_map]
     if unmapped:
         logger.warning(
