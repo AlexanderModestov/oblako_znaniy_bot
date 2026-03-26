@@ -163,6 +163,10 @@ var $listMunicipality = document.getElementById('list-municipality');
 var $searchSchool = document.getElementById('search-school');
 var $listSchool = document.getElementById('list-school');
 var $listSubjects = document.getElementById('list-subjects');
+var $btnSchoolOther = document.getElementById('btn-school-other');
+var $schoolOtherForm = document.getElementById('school-other-form');
+var $inputSchoolOther = document.getElementById('input-school-other');
+var $errorSchoolOther = document.getElementById('error-school-other');
 var $inputPhone = document.getElementById('input-phone');
 var $errorPhone = document.getElementById('error-phone');
 var $inputEmail = document.getElementById('input-email');
@@ -276,7 +280,14 @@ function showStep(n) {
         $searchMunicipality.value = '';
         loadMunicipalities('');
     } else if (n === 4) {
+        schoolOtherMode = false;
         $searchSchool.value = '';
+        $searchSchool.classList.remove('hidden');
+        $listSchool.classList.remove('hidden');
+        $btnSchoolOther.classList.remove('hidden');
+        $schoolOtherForm.classList.add('hidden');
+        $inputSchoolOther.value = '';
+        $errorSchoolOther.textContent = '';
         loadSchools('');
     } else if (n === 5) {
         loadSubjects();
@@ -409,6 +420,45 @@ var debouncedSchoolSearch = debounce(function () {
 }, 300);
 
 $searchSchool.addEventListener('input', debouncedSchoolSearch);
+
+// "Другое" school option
+var schoolOtherMode = false;
+
+$btnSchoolOther.addEventListener('click', function () {
+    schoolOtherMode = true;
+    $searchSchool.classList.add('hidden');
+    $listSchool.classList.add('hidden');
+    $btnSchoolOther.classList.add('hidden');
+    $schoolOtherForm.classList.remove('hidden');
+    $inputSchoolOther.focus();
+    platform.MainButton.setText('Далее');
+    platform.MainButton.show();
+});
+
+async function handleStep4Other() {
+    var name = $inputSchoolOther.value.trim();
+    if (!name) {
+        $errorSchoolOther.textContent = 'Введите название школы';
+        return;
+    }
+    $errorSchoolOther.textContent = '';
+    platform.MainButton.showProgress();
+    platform.MainButton.disable();
+    try {
+        var result = await api('POST', '/api/schools', {
+            region_id: formData.region_id,
+            name: name,
+        });
+        formData.school_id = result.id;
+        platform.MainButton.hideProgress();
+        platform.MainButton.enable();
+        showStep(5);
+    } catch (err) {
+        platform.MainButton.hideProgress();
+        platform.MainButton.enable();
+        $errorSchoolOther.textContent = 'Ошибка. Попробуйте ещё раз.';
+    }
+}
 
 // ===== Step 5: Subjects =====
 var subjectsLoaded = false;
@@ -561,6 +611,7 @@ async function submitRegistration() {
 function handleMainButton() {
     switch (currentStep) {
         case 1: handleStep1(); break;
+        case 4: if (schoolOtherMode) handleStep4Other(); break;
         case 5: handleStep5(); break;
         case 6: handleStep6(); break;
         case 7: handleStep7(); break;

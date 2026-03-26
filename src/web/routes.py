@@ -92,6 +92,19 @@ async def schools(
     return await user_service.get_schools_by_region(session, region_id)
 
 
+@router.post("/schools")
+async def create_school(
+    request: Request,
+    user: dict = Depends(get_platform_user),
+    session: AsyncSession = Depends(get_session),
+):
+    body = await request.json()
+    region_id = body["region_id"]
+    name = body["name"].strip()
+    school_id = await user_service.create_school(session, region_id, name)
+    return {"id": school_id}
+
+
 @router.get("/subjects")
 async def subjects(
     user: dict = Depends(get_platform_user),

@@ -82,6 +82,12 @@ class UserService:
         )
         return [{"id": s.id, "name": s.name} for s in result.scalars().all()]
 
+    async def create_school(self, session: AsyncSession, region_id: int, name: str, municipality: str | None = None) -> int:
+        school = School(region_id=region_id, name=name.strip(), municipality=municipality)
+        session.add(school)
+        await session.flush()
+        return school.id
+
     async def get_all_subjects(self, session: AsyncSession) -> list[dict]:
         result = await session.execute(select(Subject).order_by(Subject.name))
         return [{"id": s.id, "name": s.name} for s in result.scalars().all()]

@@ -35,6 +35,7 @@ class OnboardingStates(StatesGroup):
     region = State()
     municipality = State()
     school = State()
+    school_other = State()
     subjects = State()
     phone = State()
     email = State()
@@ -118,7 +119,7 @@ async def process_region_select(callback: CallbackQuery, state: FSMContext, sess
         await state.update_data(all_schools=schools)
         await callback.message.edit_text(
             "Выберите вашу школу:",
-            reply_markup=paginated_items_keyboard(schools, "onb_school"),
+            reply_markup=paginated_items_keyboard(schools, "onb_school", add_other=True),
         )
     await callback.answer()
 
@@ -145,7 +146,7 @@ async def process_municipality_select(callback: CallbackQuery, state: FSMContext
     await state.update_data(all_schools=schools)
     await callback.message.edit_text(
         "Выберите вашу школу:",
-        reply_markup=paginated_items_keyboard(schools, "onb_school"),
+        reply_markup=paginated_items_keyboard(schools, "onb_school", add_other=True),
     )
     await callback.answer()
 
@@ -156,9 +157,35 @@ async def process_school_page(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     schools = data["all_schools"]
     await callback.message.edit_reply_markup(
-        reply_markup=paginated_items_keyboard(schools, "onb_school", page=page),
+        reply_markup=paginated_items_keyboard(schools, "onb_school", page=page, add_other=True),
     )
     await callback.answer()
+
+
+@router.callback_query(OnboardingStates.school, F.data == "onb_school:other")
+async def process_school_other(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(OnboardingStates.school_other)
+    await callback.message.edit_text("Введите название вашей школы:")
+    await callback.answer()
+
+
+@router.message(OnboardingStates.school_other, F.text)
+async def process_school_other_text(message: Message, state: FSMContext, session):
+    name = message.text.strip()
+    if not name:
+        await message.answer("Пожалуйста, введите название школы:")
+        return
+    data = await state.get_data()
+    region_id = data["region_id"]
+    school_id = await user_service.create_school(session, region_id, name)
+    await state.update_data(school_id=school_id)
+    await state.set_state(OnboardingStates.subjects)
+    subjects = await user_service.get_all_subjects(session)
+    await state.update_data(available_subjects=subjects, selected_subjects=[])
+    await message.answer(
+        "Какие предметы вы ведёте? Выберите и нажмите «Готово»:",
+        reply_markup=subjects_toggle_keyboard(subjects, set()),
+    )
 
 
 @router.callback_query(OnboardingStates.school, F.data.startswith("onb_school:"))

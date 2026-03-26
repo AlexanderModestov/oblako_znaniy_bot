@@ -52,6 +52,7 @@ def pagination_keyboard(page: int, total_pages: int, callback_prefix: str) -> In
 
 def paginated_items_keyboard(
     items: list[dict], callback_prefix: str, page: int = 1, per_page: int = 8,
+    add_other: bool = False,
 ) -> InlineKeyboardBuilder:
     total_pages = max(1, -(-len(items) // per_page))
     page = max(1, min(page, total_pages))
@@ -71,6 +72,9 @@ def paginated_items_keyboard(
         if page < total_pages:
             nav_row.append(CallbackButton(text="Далее \u25b6", payload=f"{callback_prefix}_page:{page + 1}"))
         kb.row(*nav_row)
+
+    if add_other:
+        kb.row(CallbackButton(text="✏️ Другое", payload=f"{callback_prefix}:other"))
 
     return kb
 

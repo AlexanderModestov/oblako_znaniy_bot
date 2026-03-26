@@ -27,6 +27,7 @@ class OnboardingStates(StatesGroup):
     region = State()
     municipality = State()
     school = State()
+    school_other = State()
     subjects = State()
     phone = State()
     email = State()
@@ -107,7 +108,7 @@ async def process_region_select(event: MessageCallback, context: MemoryContext, 
         await context.set_state(OnboardingStates.school)
         schools = await user_service.get_schools_by_region(session, region_id)
         await context.update_data(all_schools=schools)
-        kb = paginated_items_keyboard(schools, "onb_school")
+        kb = paginated_items_keyboard(schools, "onb_school", add_other=True)
         await event.bot.edit_message(
             message_id=event.message.body.mid,
             text="Выберите вашу школу:",
@@ -137,7 +138,7 @@ async def process_municipality_select(event: MessageCallback, context: MemoryCon
     await context.set_state(OnboardingStates.school)
     schools = await user_service.get_schools_by_municipality(session, region_id, municipality)
     await context.update_data(all_schools=schools)
-    kb = paginated_items_keyboard(schools, "onb_school")
+    kb = paginated_items_keyboard(schools, "onb_school", add_other=True)
     await event.bot.edit_message(
         message_id=event.message.body.mid,
         text="Выберите вашу школу:",
@@ -150,10 +151,39 @@ async def process_school_page(event: MessageCallback, context: MemoryContext):
     page = int(event.callback.payload.split(":")[1])
     data = await context.get_data()
     schools = data["all_schools"]
-    kb = paginated_items_keyboard(schools, "onb_school", page=page)
+    kb = paginated_items_keyboard(schools, "onb_school", page=page, add_other=True)
     await event.bot.edit_message(
         message_id=event.message.body.mid,
         text="Выберите вашу школу:",
+        attachments=[kb.as_markup()],
+    )
+
+
+@router.message_callback(F.callback.payload == "onb_school:other", OnboardingStates.school)
+async def process_school_other(event: MessageCallback, context: MemoryContext):
+    await context.set_state(OnboardingStates.school_other)
+    await event.bot.edit_message(
+        message_id=event.message.body.mid,
+        text="Введите название вашей школы:",
+    )
+
+
+@router.message_created(F.message.body.text, OnboardingStates.school_other)
+async def process_school_other_text(event: MessageCreated, context: MemoryContext, session: AsyncSession):
+    name = event.message.body.text.strip()
+    if not name:
+        await event.message.answer("Пожалуйста, введите название школы:")
+        return
+    data = await context.get_data()
+    region_id = data["region_id"]
+    school_id = await user_service.create_school(session, region_id, name)
+    await context.update_data(school_id=school_id)
+    await context.set_state(OnboardingStates.subjects)
+    subjects = await user_service.get_all_subjects(session)
+    await context.update_data(available_subjects=subjects, selected_subjects=[])
+    kb = subjects_toggle_keyboard(subjects, set())
+    await event.message.answer(
+        "Какие предметы вы ведёте? Выберите и нажмите «Готово»:",
         attachments=[kb.as_markup()],
     )
 

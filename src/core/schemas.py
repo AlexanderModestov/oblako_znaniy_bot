@@ -10,7 +10,7 @@ class UserCreate(BaseModel):
     phone: str
     email: str | None = None
     region_id: int
-    school_id: int
+    school_id: int | None = None
     subjects: list[int] = []
 
     @field_validator("full_name")
