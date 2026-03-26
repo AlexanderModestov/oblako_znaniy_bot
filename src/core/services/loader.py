@@ -87,6 +87,7 @@ def _parse_sheet_with_headers(ws, headers: list[str]) -> list[dict]:
             col_map[header] = actual_lower.index(header.lower())
         except ValueError:
             pass
+    logger.info("Sheet '%s': actual headers %s, col_map %s", ws.title, actual_headers[:15], col_map)
     unmapped = [h for h in headers if h not in col_map]
     if unmapped:
         logger.warning(
@@ -179,12 +180,15 @@ async def reload_schools_data(session: AsyncSession) -> dict:
 
     regions_set: set[str] = set()
     schools_list: list[dict] = []
+    has_municipality = 0
 
     for row in rows:
         region = _str(row, "Регион")
         municipality = _str(row, "муниципалитет") or None
         school = _str(row, "школа")
         inn = _str(row, "ИНН") or None
+        if municipality:
+            has_municipality += 1
         if region:
             regions_set.add(region)
         if region and school:
@@ -194,6 +198,9 @@ async def reload_schools_data(session: AsyncSession) -> dict:
                 "school": school,
                 "inn": inn,
             })
+
+    logger.info("Parsed %d rows, %d with region+school, %d with municipality",
+                len(rows), len(schools_list), has_municipality)
 
     # Detach users from schools/regions, then wipe schools and regions
     detached = (await session.execute(
@@ -238,6 +245,8 @@ async def reload_schools_data(session: AsyncSession) -> dict:
         "regions": len(regions_set),
         "schools": len(school_values),
         "users_detached": detached,
+        "rows_total": len(rows),
+        "has_municipality": has_municipality,
     }
 
 
