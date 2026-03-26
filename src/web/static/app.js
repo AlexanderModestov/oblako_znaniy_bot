@@ -7,9 +7,20 @@ function logToServer(message) {
     }).catch(function () {});
 }
 
+// Catch any uncaught errors
+window.onerror = function (msg, src, line) {
+    logToServer('JS error: ' + msg + ' at ' + src + ':' + line);
+};
+
+// Log SDK load failures
+if (window.__tgSdkFailed) logToServer('Telegram SDK failed to load');
+if (window.__maxSdkFailed) logToServer('Max SDK failed to load');
+
 // ===== Platform Detection =====
-var tgWebApp = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
-var maxWebApp = window.WebApp || null;
+var tgWebApp = null;
+var maxWebApp = null;
+try { tgWebApp = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null; } catch (e) {}
+try { maxWebApp = window.WebApp || null; } catch (e) {}
 
 var isTelegram = !!(tgWebApp && tgWebApp.initData);
 var isMax = !!(maxWebApp && maxWebApp.initData);
