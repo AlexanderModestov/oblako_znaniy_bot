@@ -1,12 +1,76 @@
-const tg = window.Telegram.WebApp;
-tg.ready();
-tg.expand();
+// ===== Platform Detection =====
+var isMax = !!(window.WebApp && window.WebApp.initData);
+var isTelegram = !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData);
 
-const initData = tg.initData;
-const urlParams = new URLSearchParams(window.location.search);
-const botMessageId = urlParams.get('msg_id');
-let currentStep = 0;
-const formData = {
+// ===== Platform Abstraction =====
+var platform;
+
+if (isTelegram) {
+    var tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+    platform = {
+        name: 'telegram',
+        initData: tg.initData,
+        authHeader: 'X-Telegram-Init-Data',
+        close: function () { tg.close(); },
+        showAlert: function (msg) { tg.showAlert(msg); },
+        MainButton: {
+            show: function () { tg.MainButton.show(); },
+            hide: function () { tg.MainButton.hide(); },
+            setText: function (t) { tg.MainButton.setText(t); },
+            onClick: function (cb) { tg.MainButton.onClick(cb); },
+            showProgress: function () { tg.MainButton.showProgress(); },
+            hideProgress: function () { tg.MainButton.hideProgress(); },
+            enable: function () { tg.MainButton.enable(); },
+            disable: function () { tg.MainButton.disable(); },
+        },
+        BackButton: {
+            show: function () { tg.BackButton.show(); },
+            hide: function () { tg.BackButton.hide(); },
+            onClick: function (cb) { tg.BackButton.onClick(cb); },
+        },
+    };
+} else if (isMax) {
+    var maxApp = window.WebApp;
+    maxApp.ready();
+    var $maxBtn = document.getElementById('max-main-btn');
+    var maxMainCallback = null;
+    $maxBtn.addEventListener('click', function () {
+        if (maxMainCallback) maxMainCallback();
+    });
+    platform = {
+        name: 'max',
+        initData: maxApp.initData,
+        authHeader: 'X-Max-Init-Data',
+        close: function () { maxApp.close(); },
+        showAlert: function (msg) {
+            document.getElementById('max-alert-text').textContent = msg;
+            document.getElementById('max-alert-overlay').classList.remove('hidden');
+        },
+        MainButton: {
+            show: function () { $maxBtn.classList.remove('hidden'); },
+            hide: function () { $maxBtn.classList.add('hidden'); },
+            setText: function (t) { $maxBtn.textContent = t; },
+            onClick: function (cb) { maxMainCallback = cb; },
+            showProgress: function () { $maxBtn.textContent = '...'; $maxBtn.classList.add('disabled'); },
+            hideProgress: function () { $maxBtn.classList.remove('disabled'); },
+            enable: function () { $maxBtn.classList.remove('disabled'); },
+            disable: function () { $maxBtn.classList.add('disabled'); },
+        },
+        BackButton: {
+            show: function () { maxApp.BackButton.show(); },
+            hide: function () { maxApp.BackButton.hide(); },
+            onClick: function (cb) { maxApp.BackButton.onClick(cb); },
+        },
+    };
+}
+
+var initData = platform.initData;
+var urlParams = new URLSearchParams(window.location.search);
+var botMessageId = urlParams.get('msg_id');
+var currentStep = 0;
+var formData = {
     full_name: '',
     region_id: null,
     municipality: null,
@@ -17,14 +81,14 @@ const formData = {
 };
 
 // ===== DOM References =====
-const $loading = document.getElementById('loading');
-const $welcome = document.getElementById('welcome');
-const $welcomeName = document.getElementById('welcome-name');
-const $success = document.getElementById('success');
-const $progressBar = document.getElementById('progress-bar');
-const dots = document.querySelectorAll('.dot');
+var $loading = document.getElementById('loading');
+var $welcome = document.getElementById('welcome');
+var $welcomeName = document.getElementById('welcome-name');
+var $success = document.getElementById('success');
+var $progressBar = document.getElementById('progress-bar');
+var dots = document.querySelectorAll('.dot');
 
-const $steps = {
+var $steps = {
     1: document.getElementById('step-1'),
     2: document.getElementById('step-2'),
     3: document.getElementById('step-3'),
@@ -34,39 +98,35 @@ const $steps = {
     7: document.getElementById('step-7'),
 };
 
-const $inputName = document.getElementById('input-name');
-const $errorName = document.getElementById('error-name');
-const $searchRegion = document.getElementById('search-region');
-const $listRegion = document.getElementById('list-region');
-const $searchMunicipality = document.getElementById('search-municipality');
-const $listMunicipality = document.getElementById('list-municipality');
-const $searchSchool = document.getElementById('search-school');
-const $listSchool = document.getElementById('list-school');
-const $listSubjects = document.getElementById('list-subjects');
-const $inputPhone = document.getElementById('input-phone');
-const $errorPhone = document.getElementById('error-phone');
-const $inputEmail = document.getElementById('input-email');
-const $errorEmail = document.getElementById('error-email');
-const $btnSkip = document.getElementById('btn-skip');
+var $inputName = document.getElementById('input-name');
+var $errorName = document.getElementById('error-name');
+var $searchRegion = document.getElementById('search-region');
+var $listRegion = document.getElementById('list-region');
+var $searchMunicipality = document.getElementById('search-municipality');
+var $listMunicipality = document.getElementById('list-municipality');
+var $searchSchool = document.getElementById('search-school');
+var $listSchool = document.getElementById('list-school');
+var $listSubjects = document.getElementById('list-subjects');
+var $inputPhone = document.getElementById('input-phone');
+var $errorPhone = document.getElementById('error-phone');
+var $inputEmail = document.getElementById('input-email');
+var $errorEmail = document.getElementById('error-email');
+var $btnSkip = document.getElementById('btn-skip');
 
 // Municipality data cached from API
 var municipalitiesData = [];
 
 // ===== API Helper =====
 async function api(method, url, body) {
-    const opts = {
-        method,
-        headers: {
-            'X-Telegram-Init-Data': initData,
-            'Content-Type': 'application/json',
-        },
-    };
+    var headers = { 'Content-Type': 'application/json' };
+    headers[platform.authHeader] = initData;
+    var opts = { method: method, headers: headers };
     if (body !== undefined && body !== null) {
         opts.body = JSON.stringify(body);
     }
-    const res = await fetch(url, opts);
+    var res = await fetch(url, opts);
     if (!res.ok) {
-        const text = await res.text().catch(() => '');
+        var text = await res.text().catch(function () { return ''; });
         throw new Error('API error: ' + res.status + ' ' + text);
     }
     return res.json();
@@ -74,10 +134,10 @@ async function api(method, url, body) {
 
 // ===== Debounce =====
 function debounce(fn, ms) {
-    let timer = null;
+    var timer = null;
     return function () {
-        const args = arguments;
-        const ctx = this;
+        var args = arguments;
+        var ctx = this;
         clearTimeout(timer);
         timer = setTimeout(function () {
             fn.apply(ctx, args);
@@ -91,7 +151,7 @@ function hideAll() {
     $welcome.classList.add('hidden');
     $success.classList.add('hidden');
     $progressBar.classList.add('hidden');
-    for (let i = 1; i <= 7; i++) {
+    for (var i = 1; i <= 7; i++) {
         $steps[i].classList.remove('active');
     }
 }
@@ -99,8 +159,8 @@ function hideAll() {
 function showScreen(id) {
     hideAll();
     document.getElementById(id).classList.remove('hidden');
-    tg.MainButton.hide();
-    tg.BackButton.hide();
+    platform.MainButton.hide();
+    platform.BackButton.hide();
 }
 
 // ===== Progress Dots =====
@@ -126,32 +186,32 @@ function showStep(n) {
 
     // BackButton
     if (n > 1) {
-        tg.BackButton.show();
+        platform.BackButton.show();
     } else {
-        tg.BackButton.hide();
+        platform.BackButton.hide();
     }
 
     // MainButton configuration per step
     if (n === 1) {
-        tg.MainButton.setText('Далее');
-        tg.MainButton.show();
+        platform.MainButton.setText('Далее');
+        platform.MainButton.show();
     } else if (n === 2 || n === 3 || n === 4) {
         // Selection-based, no MainButton
-        tg.MainButton.hide();
+        platform.MainButton.hide();
     } else if (n === 5) {
-        tg.MainButton.setText('Готово');
+        platform.MainButton.setText('Готово');
         // Show only if at least 1 subject selected
         if (formData.subjects.length > 0) {
-            tg.MainButton.show();
+            platform.MainButton.show();
         } else {
-            tg.MainButton.hide();
+            platform.MainButton.hide();
         }
     } else if (n === 6) {
-        tg.MainButton.setText('Далее');
-        tg.MainButton.show();
+        platform.MainButton.setText('Далее');
+        platform.MainButton.show();
     } else if (n === 7) {
-        tg.MainButton.setText('Готово');
-        tg.MainButton.show();
+        platform.MainButton.setText('Готово');
+        platform.MainButton.show();
     }
 
     // Trigger data loading for certain steps
@@ -347,9 +407,9 @@ function toggleSubject(id, card) {
     }
     // Show/hide MainButton based on selection count
     if (formData.subjects.length > 0) {
-        tg.MainButton.show();
+        platform.MainButton.show();
     } else {
-        tg.MainButton.hide();
+        platform.MainButton.hide();
     }
 }
 
@@ -364,9 +424,9 @@ function updateSubjectSelection() {
         }
     });
     if (formData.subjects.length > 0) {
-        tg.MainButton.show();
+        platform.MainButton.show();
     } else {
-        tg.MainButton.hide();
+        platform.MainButton.hide();
     }
 }
 
@@ -417,8 +477,8 @@ $btnSkip.addEventListener('click', function () {
 
 // ===== Submit =====
 async function submitRegistration() {
-    tg.MainButton.showProgress();
-    tg.MainButton.disable();
+    platform.MainButton.showProgress();
+    platform.MainButton.disable();
     try {
         var registerUrl = '/api/register';
         if (botMessageId) registerUrl += '?bot_msg_id=' + botMessageId;
@@ -431,18 +491,18 @@ async function submitRegistration() {
             phone: formData.phone,
             email: formData.email,
         });
-        tg.MainButton.hideProgress();
-        tg.MainButton.hide();
-        tg.BackButton.hide();
+        platform.MainButton.hideProgress();
+        platform.MainButton.hide();
+        platform.BackButton.hide();
         hideAll();
         $success.classList.remove('hidden');
         setTimeout(function () {
-            tg.close();
+            platform.close();
         }, 2000);
     } catch (err) {
-        tg.MainButton.hideProgress();
-        tg.MainButton.enable();
-        tg.showAlert('Ошибка при регистрации. Попробуйте ещё раз.');
+        platform.MainButton.hideProgress();
+        platform.MainButton.enable();
+        platform.showAlert('Ошибка при регистрации. Попробуйте ещё раз.');
     }
 }
 
@@ -456,7 +516,7 @@ function handleMainButton() {
     }
 }
 
-tg.MainButton.onClick(handleMainButton);
+platform.MainButton.onClick(handleMainButton);
 
 // ===== BackButton Handler =====
 function handleBack() {
@@ -470,7 +530,7 @@ function handleBack() {
     }
 }
 
-tg.BackButton.onClick(handleBack);
+platform.BackButton.onClick(handleBack);
 
 // ===== Init =====
 async function init() {
@@ -481,15 +541,15 @@ async function init() {
             hideAll();
             $welcomeName.textContent = result.full_name || '';
             $welcome.classList.remove('hidden');
-            tg.MainButton.hide();
-            tg.BackButton.hide();
+            platform.MainButton.hide();
+            platform.BackButton.hide();
         } else {
             showStep(1);
         }
     } catch (err) {
         hideAll();
         $loading.classList.remove('hidden');
-        tg.showAlert('Ошибка инициализации. Попробуйте открыть приложение заново.');
+        platform.showAlert('Ошибка инициализации. Попробуйте открыть приложение заново.');
     }
 }
 

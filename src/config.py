@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     google_service_account_json: str
     openai_api_key: str
     max_bot_token: str = ""
+    max_bot_username: str = ""
     enable_telegram: bool = True
     enable_max: bool = True
     web_app_url: str = ""

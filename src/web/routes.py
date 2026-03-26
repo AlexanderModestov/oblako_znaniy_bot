@@ -2,12 +2,14 @@ import logging
 
 from aiogram import Bot
 from fastapi import APIRouter, Depends, Query
+from maxapi import Bot as MaxBot
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
 from src.core.database import get_async_session
 from src.core.schemas import UserCreate
 from src.core.services.user import UserService
+from src.max.keyboards import search_choice_keyboard as max_search_choice_keyboard
 from src.telegram.keyboards import search_choice_keyboard
 from src.web.auth import get_platform_user
 
@@ -103,13 +105,14 @@ async def register(
         data.max_user_id = None
     db_user = await user_service.create_user(session, data)
 
+    text = (
+        f"Регистрация завершена, {data.full_name}!\n\n"
+        "Выберите способ поиска:"
+    )
+
     if platform == "telegram" and data.telegram_id:
         try:
             bot = Bot(token=get_settings().bot_token)
-            text = (
-                f"Регистрация завершена, {data.full_name}!\n\n"
-                "Выберите способ поиска:"
-            )
             kb = search_choice_keyboard()
             async with bot:
                 if bot_msg_id:
@@ -125,5 +128,17 @@ async def register(
                     )
         except Exception:
             logger.exception("Failed to send post-registration message")
+
+    elif platform == "max" and data.max_user_id:
+        try:
+            max_bot = MaxBot(token=get_settings().max_bot_token)
+            kb = max_search_choice_keyboard()
+            await max_bot.send_message(
+                user_id=data.max_user_id,
+                text=text,
+                attachments=[kb.as_markup()],
+            )
+        except Exception:
+            logger.exception("Failed to send Max post-registration message")
 
     return {"ok": True, "user_id": db_user.id}

@@ -303,3 +303,78 @@ input:focus {
 .skip-button:active {
     opacity: 0.6;
 }
+
+/* ===== Max: MainButton (HTML fallback) ===== */
+.max-main-btn {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #3390ec;
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    z-index: 200;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: opacity 0.15s ease;
+}
+
+.max-main-btn.hidden {
+    display: none;
+}
+
+.max-main-btn.disabled {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.max-main-btn:active {
+    opacity: 0.8;
+}
+
+/* ===== Max: Alert Modal ===== */
+.max-alert-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.max-alert-overlay.hidden {
+    display: none;
+}
+
+.max-alert-box {
+    background: #fff;
+    border-radius: 14px;
+    padding: 24px;
+    max-width: 280px;
+    width: 90%;
+    text-align: center;
+}
+
+.max-alert-box p {
+    margin: 0 0 16px;
+    font-size: 15px;
+    color: #000;
+}
+
+.max-alert-box button {
+    background: #3390ec;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 32px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+}
