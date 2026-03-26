@@ -121,7 +121,7 @@ def fetch_schools_from_sheets() -> list[dict]:
     return _parse_sheet_with_headers(ws, SCHOOL_HEADERS)
 
 
-SUBJECT_HEADERS = ["Id", "Name", "Code"]
+SUBJECT_HEADERS = ["Id", "Name"]
 COURSE_HEADERS = ["ИД курса", "Наименование", "Описание", "Актуальность", "Ссылка на демо", "Ссылка на методичку", "Стандарты", "Навыки", "Удалено", "Статус МШ"]
 SECTION_HEADERS = ["ИД раздела", "ИД курса", "Наименование", "Описание", "Актуальность", "Ссылка на демо", "Ссылка на методичку", "Стандарты", "Навыки", "Удалено", "Статус МШ"]
 TOPIC_HEADERS = ["ИД темы", "ИД раздела", "Наименование", "Описание", "Актуальность", "Ссылка на демо", "Ссылка на методичку", "Навыки", "Удалено", "Статус МШ"]
@@ -239,21 +239,18 @@ async def reload_schools_data(session: AsyncSession) -> dict:
 
 
 async def reload_subjects_data(session: AsyncSession, rows: list[dict]) -> dict:
-    """Parse 'subjects' tab with columns: Name, Code. Upsert on name, update code."""
+    """Parse 'subjects' tab with columns: Id, Name. Upsert on name."""
     values = []
     for row in rows:
         name = _str(row, "Name")
         if not name:
             continue
-        values.append({"name": name, "code": _str(row, "Code") or None})
+        values.append({"name": name})
 
     for i in range(0, len(values), BATCH_SIZE):
         batch = values[i : i + BATCH_SIZE]
         stmt = pg_insert(Subject).values(batch)
-        stmt = stmt.on_conflict_do_update(
-            index_elements=["name"],
-            set_={"code": stmt.excluded.code},
-        )
+        stmt = stmt.on_conflict_do_nothing(index_elements=["name"])
         await session.execute(stmt)
 
     await session.commit()

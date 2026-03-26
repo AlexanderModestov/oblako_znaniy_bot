@@ -47,7 +47,6 @@ class Subject(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    code: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
 
 class User(Base):
