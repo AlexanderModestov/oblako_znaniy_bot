@@ -3,10 +3,11 @@ from maxapi.context import MemoryContext
 from maxapi.types import MessageCallback, MessageCreated
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config import get_settings
 from src.core.services.search import SearchService
 from src.core.services.user import UserService
 from src.max.formatters import format_text_results
-from src.max.keyboards import search_pagination_keyboard
+from src.max.keyboards import registration_keyboard, search_pagination_keyboard
 
 router = Router(router_id="max_search")
 search_service = SearchService()
@@ -18,9 +19,17 @@ async def handle_search(event: MessageCreated, context: MemoryContext, session: 
     """Catch-all: any text message from registered user triggers search."""
     user = await user_service.get_by_max_user_id(session, event.message.sender.user_id)
     if not user:
-        await event.message.answer(
-            "Вы ещё не зарегистрированы. Нажмите «Начать» для регистрации."
-        )
+        settings = get_settings()
+        if settings.web_app_url:
+            kb = registration_keyboard(settings.web_app_url)
+            await event.message.answer(
+                "Вы ещё не зарегистрированы. Пройдите регистрацию:",
+                attachments=[kb.as_markup()],
+            )
+        else:
+            await event.message.answer(
+                "Вы ещё не зарегистрированы. Нажмите «Начать» для регистрации."
+            )
         return
 
     query = event.message.body.text.strip()

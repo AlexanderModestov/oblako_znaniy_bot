@@ -6,10 +6,12 @@ from maxapi.types import BotStarted, MessageCallback, MessageCreated
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config import get_settings
 from src.core.schemas import UserCreate
 from src.core.services.user import UserService
 from src.max.keyboards import (
     paginated_items_keyboard,
+    registration_keyboard,
     search_choice_keyboard,
     skip_keyboard,
     subjects_toggle_keyboard,
@@ -39,6 +41,15 @@ async def on_bot_started(event: BotStarted, context: MemoryContext, session: Asy
             chat_id=event.chat_id,
             text=f"С возвращением, {user.full_name}!\n\n"
                  "Выберите способ поиска:",
+            attachments=[kb.as_markup()],
+        )
+        return
+    settings = get_settings()
+    if settings.web_app_url:
+        kb = registration_keyboard(settings.web_app_url)
+        await event.bot.send_message(
+            chat_id=event.chat_id,
+            text="Добро пожаловать! Для начала работы пройдите регистрацию:",
             attachments=[kb.as_markup()],
         )
         return
