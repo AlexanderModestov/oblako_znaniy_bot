@@ -62,7 +62,7 @@ async def select_grade(event: MessageCallback, context: MemoryContext, session: 
             attachments=[kb.as_markup()],
         )
     else:
-        await _show_results(event, context, session: AsyncSession)
+        await _show_results(event, context, session)
 
 
 @router.message_callback(F.callback.payload.startswith("ps_section:"))
@@ -72,7 +72,7 @@ async def select_section(event: MessageCallback, context: MemoryContext, session
     filters = data["filter"]
 
     if value == "skip":
-        await _show_results(event, context, session: AsyncSession)
+        await _show_results(event, context, session)
         return
 
     # Look up section name by index
@@ -91,7 +91,7 @@ async def select_section(event: MessageCallback, context: MemoryContext, session
             attachments=[kb.as_markup()],
         )
     else:
-        await _show_results(event, context, session: AsyncSession)
+        await _show_results(event, context, session)
 
 
 @router.message_callback(F.callback.payload.startswith("ps_topic:"))
@@ -106,7 +106,7 @@ async def select_topic(event: MessageCallback, context: MemoryContext, session: 
         filters["topic"] = topics[int(value)]["name"]
         await context.update_data(filter=filters)
 
-    await _show_results(event, context, session: AsyncSession)
+    await _show_results(event, context, session)
 
 
 # --- Back navigation ---
