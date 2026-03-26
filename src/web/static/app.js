@@ -1,39 +1,63 @@
+// ===== Send errors to server logs =====
+function logToServer(message) {
+    fetch('/api/client-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: message }),
+    }).catch(function () {});
+}
+
 // ===== Platform Detection =====
-var isMax = !!(window.WebApp && window.WebApp.initData);
-var isTelegram = !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData);
+var tgWebApp = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+var maxWebApp = window.WebApp || null;
+
+var isTelegram = !!(tgWebApp && tgWebApp.initData);
+var isMax = !!(maxWebApp && maxWebApp.initData);
+
+// If both have initData (shouldn't happen), prefer Telegram
+if (isTelegram && isMax) {
+    isMax = false;
+}
+
+if (!isTelegram && !isMax) {
+    logToServer(
+        'Platform not detected. '
+        + 'TG SDK: ' + !!tgWebApp + ', TG initData: ' + (tgWebApp ? tgWebApp.initData.length : 'N/A') + '. '
+        + 'Max SDK: ' + !!maxWebApp + ', Max initData: ' + (maxWebApp ? maxWebApp.initData.length : 'N/A') + '. '
+        + 'URL: ' + window.location.href
+    );
+}
 
 // ===== Platform Abstraction =====
 var platform;
 
 if (isTelegram) {
-    var tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand();
+    tgWebApp.ready();
+    tgWebApp.expand();
     platform = {
         name: 'telegram',
-        initData: tg.initData,
+        initData: tgWebApp.initData,
         authHeader: 'X-Telegram-Init-Data',
-        close: function () { tg.close(); },
-        showAlert: function (msg) { tg.showAlert(msg); },
+        close: function () { tgWebApp.close(); },
+        showAlert: function (msg) { tgWebApp.showAlert(msg); },
         MainButton: {
-            show: function () { tg.MainButton.show(); },
-            hide: function () { tg.MainButton.hide(); },
-            setText: function (t) { tg.MainButton.setText(t); },
-            onClick: function (cb) { tg.MainButton.onClick(cb); },
-            showProgress: function () { tg.MainButton.showProgress(); },
-            hideProgress: function () { tg.MainButton.hideProgress(); },
-            enable: function () { tg.MainButton.enable(); },
-            disable: function () { tg.MainButton.disable(); },
+            show: function () { tgWebApp.MainButton.show(); },
+            hide: function () { tgWebApp.MainButton.hide(); },
+            setText: function (t) { tgWebApp.MainButton.setText(t); },
+            onClick: function (cb) { tgWebApp.MainButton.onClick(cb); },
+            showProgress: function () { tgWebApp.MainButton.showProgress(); },
+            hideProgress: function () { tgWebApp.MainButton.hideProgress(); },
+            enable: function () { tgWebApp.MainButton.enable(); },
+            disable: function () { tgWebApp.MainButton.disable(); },
         },
         BackButton: {
-            show: function () { tg.BackButton.show(); },
-            hide: function () { tg.BackButton.hide(); },
-            onClick: function (cb) { tg.BackButton.onClick(cb); },
+            show: function () { tgWebApp.BackButton.show(); },
+            hide: function () { tgWebApp.BackButton.hide(); },
+            onClick: function (cb) { tgWebApp.BackButton.onClick(cb); },
         },
     };
 } else if (isMax) {
-    var maxApp = window.WebApp;
-    maxApp.ready();
+    maxWebApp.ready();
     var $maxBtn = document.getElementById('max-main-btn');
     var maxMainCallback = null;
     $maxBtn.addEventListener('click', function () {
@@ -41,9 +65,9 @@ if (isTelegram) {
     });
     platform = {
         name: 'max',
-        initData: maxApp.initData,
+        initData: maxWebApp.initData,
         authHeader: 'X-Max-Init-Data',
-        close: function () { maxApp.close(); },
+        close: function () { maxWebApp.close(); },
         showAlert: function (msg) {
             document.getElementById('max-alert-text').textContent = msg;
             document.getElementById('max-alert-overlay').classList.remove('hidden');
@@ -59,9 +83,30 @@ if (isTelegram) {
             disable: function () { $maxBtn.classList.add('disabled'); },
         },
         BackButton: {
-            show: function () { maxApp.BackButton.show(); },
-            hide: function () { maxApp.BackButton.hide(); },
-            onClick: function (cb) { maxApp.BackButton.onClick(cb); },
+            show: function () { maxWebApp.BackButton.show(); },
+            hide: function () { maxWebApp.BackButton.hide(); },
+            onClick: function (cb) { maxWebApp.BackButton.onClick(cb); },
+        },
+    };
+} else {
+    // Fallback: show loading screen, user sees nothing broken
+    // Error is already logged to server above
+    platform = {
+        name: 'unknown',
+        initData: '',
+        authHeader: 'X-Unknown',
+        close: function () { window.close(); },
+        showAlert: function (msg) {
+            document.getElementById('max-alert-text').textContent = msg;
+            document.getElementById('max-alert-overlay').classList.remove('hidden');
+        },
+        MainButton: {
+            show: function () {}, hide: function () {}, setText: function () {},
+            onClick: function () {}, showProgress: function () {}, hideProgress: function () {},
+            enable: function () {}, disable: function () {},
+        },
+        BackButton: {
+            show: function () {}, hide: function () {}, onClick: function () {},
         },
     };
 }
@@ -196,11 +241,9 @@ function showStep(n) {
         platform.MainButton.setText('Далее');
         platform.MainButton.show();
     } else if (n === 2 || n === 3 || n === 4) {
-        // Selection-based, no MainButton
         platform.MainButton.hide();
     } else if (n === 5) {
         platform.MainButton.setText('Готово');
-        // Show only if at least 1 subject selected
         if (formData.subjects.length > 0) {
             platform.MainButton.show();
         } else {
@@ -301,7 +344,6 @@ async function loadMunicipalities(query) {
             });
         }
         if (filtered.length === 0 && !query) {
-            // No municipalities for this region, skip to school
             showStep(4);
             return;
         }
@@ -317,7 +359,6 @@ async function loadMunicipalities(query) {
 var debouncedMunicipalitySearch = debounce(function () {
     var query = $searchMunicipality.value.trim();
     if (municipalitiesData.length > 0) {
-        // Filter locally since we already have all data
         var filtered = municipalitiesData;
         if (query) {
             var q = query.toLowerCase();
@@ -405,7 +446,6 @@ function toggleSubject(id, card) {
         formData.subjects.splice(idx, 1);
         card.classList.remove('selected');
     }
-    // Show/hide MainButton based on selection count
     if (formData.subjects.length > 0) {
         platform.MainButton.show();
     } else {
@@ -483,7 +523,7 @@ async function submitRegistration() {
         var registerUrl = '/api/register';
         if (botMessageId) registerUrl += '?bot_msg_id=' + botMessageId;
         await api('POST', registerUrl, {
-            telegram_id: 0,  // Will be overridden by server from auth header
+            telegram_id: 0,
             full_name: formData.full_name,
             region_id: formData.region_id,
             school_id: formData.school_id,
@@ -521,7 +561,6 @@ platform.MainButton.onClick(handleMainButton);
 // ===== BackButton Handler =====
 function handleBack() {
     if (currentStep > 1) {
-        // If going back from school (step 4) and no municipalities exist, skip to region (step 2)
         if (currentStep === 4 && municipalitiesData.length === 0) {
             showStep(2);
         } else {
@@ -547,9 +586,8 @@ async function init() {
             showStep(1);
         }
     } catch (err) {
-        hideAll();
-        $loading.classList.remove('hidden');
-        platform.showAlert('Ошибка инициализации. Попробуйте открыть приложение заново.');
+        logToServer('Auth failed: ' + err.message + ' | platform: ' + platform.name + ' | initData length: ' + initData.length);
+        platform.showAlert('Не удалось загрузить приложение. Попробуйте открыть заново.');
     }
 }
 

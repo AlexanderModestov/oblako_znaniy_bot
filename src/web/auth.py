@@ -1,12 +1,15 @@
 import hashlib
 import hmac
 import json
+import logging
 import time
 from urllib.parse import parse_qs, unquote
 
 from fastapi import Header, HTTPException
 
 from src.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 def validate_init_data(init_data: str, bot_token: str) -> dict:
@@ -80,6 +83,11 @@ async def get_platform_user(
             user_data["platform"] = "max"
             return user_data
         except (ValueError, KeyError) as e:
+            logger.error(
+                "Max initData validation failed: %s | initData keys: %s",
+                e,
+                list(parse_qs(x_max_init_data).keys()) if x_max_init_data else "N/A",
+            )
             raise HTTPException(status_code=401, detail=str(e))
 
     raise HTTPException(status_code=401, detail="No auth header provided")

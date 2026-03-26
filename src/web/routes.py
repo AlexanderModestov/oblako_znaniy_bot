@@ -1,7 +1,7 @@
 import logging
 
 from aiogram import Bot
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from maxapi import Bot as MaxBot
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,6 +23,17 @@ async def get_session():
     session_factory = get_async_session()
     async with session_factory() as session:
         yield session
+
+
+@router.post("/client-log")
+async def client_log(request: Request):
+    """Receive error logs from frontend for server-side visibility."""
+    try:
+        body = await request.json()
+        logger.error("[WebApp Frontend] %s", body.get("message", body))
+    except Exception:
+        pass
+    return {"ok": True}
 
 
 @router.post("/auth")
