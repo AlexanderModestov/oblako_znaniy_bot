@@ -20,8 +20,8 @@ async def handle_search(event: MessageCreated, context: MemoryContext, session: 
     user = await user_service.get_by_max_user_id(session, event.message.sender.user_id)
     if not user:
         settings = get_settings()
-        if settings.max_bot_username:
-            kb = registration_keyboard(settings.max_bot_username)
+        if settings.web_app_url:
+            kb = registration_keyboard(settings.web_app_url)
             await event.message.answer(
                 "Вы ещё не зарегистрированы. Пройдите регистрацию:",
                 attachments=[kb.as_markup()],

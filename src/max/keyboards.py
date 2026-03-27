@@ -105,9 +105,9 @@ def search_pagination_keyboard(page: int, total_pages: int) -> InlineKeyboardBui
     return kb
 
 
-def registration_keyboard(bot_username: str) -> InlineKeyboardBuilder:
+def registration_keyboard(web_app_url: str) -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
-    kb.row(OpenAppButton(text="Зарегистрироваться", web_app=bot_username))
+    kb.row(OpenAppButton(text="Зарегистрироваться", web_app=web_app_url))
     return kb
 
 
