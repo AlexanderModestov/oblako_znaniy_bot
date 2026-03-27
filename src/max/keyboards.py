@@ -105,6 +105,13 @@ def search_pagination_keyboard(page: int, total_pages: int) -> InlineKeyboardBui
     return kb
 
 
+def clarify_keyboard(dominant_value: str) -> InlineKeyboardBuilder:
+    kb = InlineKeyboardBuilder()
+    kb.row(CallbackButton(text=dominant_value, payload="clarify:dominant"))
+    kb.row(CallbackButton(text="Все найденные", payload="clarify:all"))
+    return kb
+
+
 def registration_keyboard(bot_username: str, bot_contact_id: int | None = None) -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
     kb.row(OpenAppButton(
