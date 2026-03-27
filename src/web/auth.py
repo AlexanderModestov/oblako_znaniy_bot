@@ -83,10 +83,25 @@ async def get_platform_user(
             user_data["platform"] = "max"
             return user_data
         except (ValueError, KeyError) as e:
+            # Debug: log data_check_string for troubleshooting
+            parsed = parse_qs(x_max_init_data)
+            items = []
+            for key, values in parsed.items():
+                if key == "hash":
+                    continue
+                items.append(f"{key}={unquote(values[0])}")
+            data_check_string = "\n".join(sorted(items))
+            secret_key = hmac.new(b"WebAppData", settings.max_bot_token.encode(), hashlib.sha256).digest()
+            computed = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+            received = parsed.get("hash", [None])[0]
             logger.error(
-                "Max initData validation failed: %s | initData keys: %s",
+                "Max initData validation failed: %s | initData keys: %s | computed: %s | received: %s | token_prefix: %s | data_check_string_preview: %s",
                 e,
-                list(parse_qs(x_max_init_data).keys()) if x_max_init_data else "N/A",
+                list(parsed.keys()),
+                computed[:16],
+                received[:16] if received else "N/A",
+                settings.max_bot_token[:8] + "...",
+                data_check_string[:100],
             )
             raise HTTPException(status_code=401, detail=str(e))
 
