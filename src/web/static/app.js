@@ -33,8 +33,8 @@ if (isTelegram && isMax) {
 if (!isTelegram && !isMax) {
     logToServer(
         'Platform not detected. '
-        + 'TG SDK: ' + !!tgWebApp + ', TG initData: ' + (tgWebApp ? tgWebApp.initData.length : 'N/A') + '. '
-        + 'Max SDK: ' + !!maxWebApp + ', Max initData: ' + (maxWebApp ? maxWebApp.initData.length : 'N/A') + '. '
+        + 'TG SDK: ' + !!tgWebApp + ', TG initData: ' + (tgWebApp && tgWebApp.initData ? tgWebApp.initData.length : 'N/A') + '. '
+        + 'Max SDK: ' + !!maxWebApp + ', Max initData: ' + (maxWebApp && maxWebApp.initData ? maxWebApp.initData.length : 'N/A') + '. '
         + 'URL: ' + window.location.href
     );
 }
