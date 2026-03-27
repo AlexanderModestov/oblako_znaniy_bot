@@ -19,6 +19,11 @@ router = APIRouter(prefix="/api")
 user_service = UserService()
 
 
+@router.get("/health")
+async def health():
+    return {"ok": True}
+
+
 async def get_session():
     session_factory = get_async_session()
     async with session_factory() as session:
