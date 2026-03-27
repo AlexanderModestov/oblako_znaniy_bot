@@ -20,9 +20,8 @@ async def handle_search(event: MessageCreated, context: MemoryContext, session: 
     user = await user_service.get_by_max_user_id(session, event.message.sender.user_id)
     if not user:
         settings = get_settings()
-        if settings.web_app_url:
+        if settings.web_app_url and settings.max_bot_username:
             kb = registration_keyboard(
-                web_app_url=settings.web_app_url,
                 bot_username=settings.max_bot_username,
                 bot_contact_id=settings.max_bot_id or None,
             )
