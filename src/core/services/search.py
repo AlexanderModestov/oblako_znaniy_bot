@@ -7,7 +7,7 @@ from sqlalchemy.orm import joinedload
 
 from src.config import get_settings
 from src.core.models import Lesson
-from src.core.schemas import LessonResult, SearchResult
+from src.core.schemas import ClarifyQuestion, LessonResult, SearchResult
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,7 @@ class SearchService:
         self.fts_min_results = settings.fts_min_results
         self.similarity_threshold = settings.semantic_similarity_threshold
         self.per_page = settings.results_per_page
+        self.clarify_threshold = settings.search_clarify_threshold
 
     async def fts_search(self, session: AsyncSession, query: str, page: int = 1) -> tuple[list[LessonResult], int]:
         ts_query = _build_tsquery(query)
@@ -120,3 +121,60 @@ class SearchService:
         page_lessons = combined[offset : offset + self.per_page]
 
         return SearchResult(query=query, lessons=page_lessons, total=total, page=page, per_page=self.per_page)
+
+    def check_clarification(
+        self,
+        lessons: list[LessonResult],
+        stage: str = "subject",
+        selected_subject: str | None = None,
+    ) -> ClarifyQuestion | None:
+        if len(lessons) <= self.clarify_threshold:
+            return None
+
+        field = "subject" if stage == "subject" else "topic"
+        counts: dict[str, int] = {}
+        for lesson in lessons:
+            value = getattr(lesson, field) or ""
+            if value:
+                counts[value] = counts.get(value, 0) + 1
+
+        if len(counts) <= 1:
+            return None
+
+        dominant = max(counts, key=counts.get)
+        total = len(lessons)
+
+        if stage == "subject":
+            message = f"Найдено {total} результатов. Показать уроки по {dominant}? Или все найденные?"
+        else:
+            message = f"Найдено {total} результатов по {selected_subject}. Показать уроки по теме {dominant}? Или все по {selected_subject}?"
+
+        return ClarifyQuestion(
+            stage=stage,
+            dominant_value=dominant,
+            total=total,
+            message=message,
+        )
+
+    async def fts_search_all(self, session: AsyncSession, query: str) -> list[LessonResult]:
+        """Fetch all FTS results without pagination (for clarification analysis)."""
+        ts_query = _build_tsquery(query)
+        na_last = case((Lesson.url == "N/A", 1), else_=0)
+        q = (
+            select(Lesson)
+            .options(joinedload(Lesson.subject))
+            .where(Lesson.search_vector.op("@@")(ts_query))
+            .order_by(na_last, func.ts_rank(Lesson.search_vector, ts_query).desc())
+        )
+        result = await session.execute(q)
+        return [
+            LessonResult(
+                title=l.title, url=l.url,
+                description=l.description,
+                subject=l.subject.name,
+                section=l.section,
+                topic=l.topic,
+                is_semantic=False,
+            )
+            for l in result.scalars().unique().all()
+        ]
