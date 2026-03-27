@@ -121,6 +121,13 @@ def search_pagination_keyboard(page: int, total_pages: int) -> InlineKeyboardMar
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
+def clarify_keyboard(dominant_value: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=dominant_value, callback_data="clarify:dominant")],
+        [InlineKeyboardButton(text="Все найденные", callback_data="clarify:all")],
+    ])
+
+
 def search_choice_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="\U0001f50d Введите Ваш запрос", callback_data="search_text")],
