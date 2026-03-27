@@ -47,8 +47,12 @@ async def on_bot_started(event: BotStarted, context: MemoryContext, session: Asy
         )
         return
     settings = get_settings()
-    if settings.web_app_url and settings.max_bot_username:
-        kb = registration_keyboard(settings.max_bot_username)
+    if settings.web_app_url:
+        kb = registration_keyboard(
+            web_app_url=settings.web_app_url,
+            bot_username=settings.max_bot_username,
+            bot_contact_id=settings.max_bot_id or None,
+        )
         await event.bot.send_message(
             chat_id=event.chat_id,
             text="Добро пожаловать! Для начала работы пройдите регистрацию:",

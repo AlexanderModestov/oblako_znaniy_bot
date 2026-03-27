@@ -21,7 +21,11 @@ async def handle_search(event: MessageCreated, context: MemoryContext, session: 
     if not user:
         settings = get_settings()
         if settings.web_app_url:
-            kb = registration_keyboard(settings.web_app_url)
+            kb = registration_keyboard(
+                web_app_url=settings.web_app_url,
+                bot_username=settings.max_bot_username,
+                bot_contact_id=settings.max_bot_id or None,
+            )
             await event.message.answer(
                 "Вы ещё не зарегистрированы. Пройдите регистрацию:",
                 attachments=[kb.as_markup()],

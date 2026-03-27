@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     openai_api_key: str
     max_bot_token: str = ""
     max_bot_username: str = ""
+    max_bot_id: int = 0
     enable_telegram: bool = True
     enable_max: bool = True
     web_app_url: str = ""
