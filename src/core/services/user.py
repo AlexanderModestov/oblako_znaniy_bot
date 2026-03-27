@@ -85,7 +85,8 @@ class UserService:
     async def create_school(self, session: AsyncSession, region_id: int, name: str, municipality: str | None = None) -> int:
         school = School(region_id=region_id, name=name.strip(), municipality=municipality)
         session.add(school)
-        await session.flush()
+        await session.commit()
+        await session.refresh(school)
         return school.id
 
     async def get_all_subjects(self, session: AsyncSession) -> list[dict]:
