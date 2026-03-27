@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     fts_min_results: int = 3
     semantic_similarity_threshold: float = 0.75
     results_per_page: int = 5
+    search_clarify_threshold: int = 10
 
     class Config:
         env_file = ".env"
