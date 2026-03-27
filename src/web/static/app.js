@@ -11,6 +11,9 @@ function logToServer(message) {
 window.onerror = function (msg, src, line) {
     logToServer('JS error: ' + msg + ' at ' + src + ':' + line);
 };
+window.addEventListener('unhandledrejection', function (e) {
+    logToServer('Unhandled promise rejection: ' + (e.reason ? (e.reason.message || e.reason) : 'unknown'));
+});
 
 // Log SDK load failures
 if (window.__tgSdkFailed) logToServer('Telegram SDK failed to load');
@@ -635,9 +638,11 @@ platform.BackButton.onClick(handleBack);
 
 // ===== Init =====
 async function init() {
+    logToServer('init: start | platform: ' + platform.name + ' | initData length: ' + initData.length + ' | UA: ' + navigator.userAgent.substring(0, 120));
     showScreen('loading');
     try {
         var result = await api('POST', '/api/auth');
+        logToServer('init: auth ok | status: ' + result.status + ' | platform: ' + platform.name);
         if (result.status === 'existing') {
             hideAll();
             $welcomeName.textContent = result.full_name || '';
