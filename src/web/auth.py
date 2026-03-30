@@ -57,9 +57,36 @@ async def get_telegram_user(x_telegram_init_data: str = Header()) -> dict:
 
 def validate_max_init_data(init_data: str, bot_token: str) -> dict:
     """Validate MAX WebApp initData and return parsed data.
-    MAX uses the same HMAC-SHA256 validation scheme as Telegram.
+
+    MAX uses the same HMAC-SHA256 scheme as Telegram but may include
+    fields with empty values (e.g. start_param=).  The standard
+    parse_qs drops them by default which breaks the hash check.
     """
-    return validate_init_data(init_data, bot_token)
+    parsed = parse_qs(init_data, keep_blank_values=True)
+
+    check_hash = parsed.get("hash", [None])[0]
+    if not check_hash:
+        raise ValueError("hash missing")
+
+    items = []
+    for key, values in parsed.items():
+        if key == "hash":
+            continue
+        items.append(f"{key}={unquote(values[0])}")
+    data_check_string = "\n".join(sorted(items))
+
+    secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+    computed_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+
+    if not hmac.compare_digest(computed_hash, check_hash):
+        raise ValueError("invalid hash")
+
+    auth_date = int(parsed.get("auth_date", [0])[0])
+    if time.time() - auth_date > 86400:
+        raise ValueError("init_data expired")
+
+    user_data = json.loads(unquote(parsed["user"][0]))
+    return user_data
 
 
 async def get_platform_user(
