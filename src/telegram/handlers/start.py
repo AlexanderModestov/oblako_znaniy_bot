@@ -30,7 +30,16 @@ user_service = UserService()
 logger = logging.getLogger(__name__)
 
 
+CONSENT_TEXT = (
+    "Для регистрации нам необходимо обработать ваши персональные данные "
+    "(ФИО, телефон, email, регион, место работы).\n\n"
+    "Данные используются исключительно для работы сервиса и не передаются третьим лицам.\n\n"
+    "Нажмите «Согласен», чтобы продолжить регистрацию."
+)
+
+
 class OnboardingStates(StatesGroup):
+    consent = State()
     full_name = State()
     region = State()
     municipality = State()
@@ -67,11 +76,32 @@ async def cmd_start(message: Message, state: FSMContext, session):
         )
         return
 
+    await state.set_state(OnboardingStates.consent)
+    consent_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Согласен", callback_data="onb_consent:yes")],
+        [InlineKeyboardButton(text="Не согласен", callback_data="onb_consent:no")],
+    ])
+    await message.answer(CONSENT_TEXT, reply_markup=consent_kb)
+
+
+@router.callback_query(OnboardingStates.consent, F.data == "onb_consent:yes")
+async def process_consent_yes(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(consent_given=True)
     await state.set_state(OnboardingStates.full_name)
-    await message.answer(
-        "Добро пожаловать! Давайте зарегистрируемся.\n\n"
+    await callback.message.edit_text(
         "Введите ваше ФИО (Фамилия Имя Отчество) одним сообщением:"
     )
+    await callback.answer()
+
+
+@router.callback_query(OnboardingStates.consent, F.data == "onb_consent:no")
+async def process_consent_no(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.edit_text(
+        "Без согласия на обработку персональных данных использование сервиса невозможно.\n\n"
+        "Если передумаете — нажмите /start"
+    )
+    await callback.answer()
 
 
 @router.message(OnboardingStates.full_name)
@@ -283,6 +313,7 @@ async def _finish_onboarding(message, state: FSMContext, session, telegram_id: i
             region_id=data["region_id"],
             school_id=data["school_id"],
             subjects=data.get("subjects", []),
+            consent_given=data.get("consent_given", False),
         )
         await user_service.create_user(session, user_data)
     except Exception:

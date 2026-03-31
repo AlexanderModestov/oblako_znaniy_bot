@@ -77,6 +77,52 @@ html, body {
     100% { transform: translateY(0); opacity: 1; }
 }
 
+/* ===== Consent ===== */
+.consent-text {
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--tg-theme-text-color, #000000);
+    text-align: center;
+    margin: 0 0 12px;
+    max-width: 340px;
+}
+
+.consent-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    max-width: 280px;
+    margin-top: 20px;
+}
+
+.consent-btn {
+    padding: 14px 24px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.consent-btn:active {
+    opacity: 0.7;
+}
+
+.consent-btn-yes {
+    background-color: var(--tg-theme-button-color, #3390ec);
+    color: var(--tg-theme-button-text-color, #ffffff);
+}
+
+.consent-btn-no {
+    background: none;
+    color: var(--tg-theme-hint-color, #999999);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
 /* ===== Progress Bar ===== */
 #progress-bar {
     position: fixed;

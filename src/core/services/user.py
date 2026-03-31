@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +30,8 @@ class UserService:
             region_id=data.region_id,
             school_id=data.school_id,
             subjects=data.subjects,
+            consent_given=data.consent_given,
+            consent_at=datetime.now(timezone.utc) if data.consent_given else None,
         )
         session.add(user)
         await session.commit()

@@ -31,6 +31,28 @@
     <h1 class="success-heading">Регистрация завершена!</h1>
 </div>
 
+<!-- Consent screen -->
+<div id="consent" class="screen hidden">
+    <h2>Согласие на обработку данных</h2>
+    <p class="consent-text">
+        Для регистрации нам необходимо обработать ваши персональные данные
+        (ФИО, телефон, email, регион, место работы).
+    </p>
+    <p class="consent-text">
+        Данные используются исключительно для работы сервиса и не передаются третьим лицам.
+    </p>
+    <div class="consent-actions">
+        <button type="button" id="btn-consent-yes" class="consent-btn consent-btn-yes">Согласен</button>
+        <button type="button" id="btn-consent-no" class="consent-btn consent-btn-no">Не согласен</button>
+    </div>
+</div>
+
+<!-- Consent declined screen -->
+<div id="consent-declined" class="screen hidden">
+    <h2>Регистрация невозможна</h2>
+    <p class="consent-text">Без согласия на обработку персональных данных использование сервиса невозможно.</p>
+</div>
+
 <!-- Progress bar -->
 <div id="progress-bar" class="hidden">
     <div class="progress-dots">

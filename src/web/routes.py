@@ -1,7 +1,7 @@
 import logging
 
 from aiogram import Bot
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from maxapi import Bot as MaxBot
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -125,6 +125,8 @@ async def register(
     session: AsyncSession = Depends(get_session),
     bot_msg_id: int | None = Query(default=None),
 ):
+    if not data.consent_given:
+        raise HTTPException(status_code=422, detail="Consent is required")
     platform = user.get("platform", "telegram")
     if platform == "max":
         data.max_user_id = user["id"]

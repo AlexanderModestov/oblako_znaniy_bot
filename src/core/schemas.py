@@ -12,6 +12,7 @@ class UserCreate(BaseModel):
     region_id: int
     school_id: int | None = None
     subjects: list[int] = []
+    consent_given: bool = False
 
     @field_validator("full_name")
     @classmethod

@@ -129,6 +129,7 @@ var initData = platform.initData;
 var urlParams = new URLSearchParams(window.location.search);
 var botMessageId = urlParams.get('msg_id');
 var currentStep = 0;
+var consentGiven = false;
 var formData = {
     full_name: '',
     region_id: null,
@@ -176,6 +177,18 @@ var $inputEmail = document.getElementById('input-email');
 var $errorEmail = document.getElementById('error-email');
 var $btnSkip = document.getElementById('btn-skip');
 
+var $btnConsentYes = document.getElementById('btn-consent-yes');
+var $btnConsentNo = document.getElementById('btn-consent-no');
+
+$btnConsentYes.addEventListener('click', function () {
+    consentGiven = true;
+    showStep(1);
+});
+
+$btnConsentNo.addEventListener('click', function () {
+    showScreen('consent-declined');
+});
+
 // Municipality data cached from API
 var municipalitiesData = [];
 
@@ -214,6 +227,8 @@ function hideAll() {
     $welcome.classList.add('hidden');
     $success.classList.add('hidden');
     $progressBar.classList.add('hidden');
+    document.getElementById('consent').classList.add('hidden');
+    document.getElementById('consent-declined').classList.add('hidden');
     for (var i = 1; i <= 7; i++) {
         $steps[i].classList.remove('active');
     }
@@ -594,6 +609,7 @@ async function submitRegistration() {
             subjects: formData.subjects,
             phone: formData.phone,
             email: formData.email,
+            consent_given: consentGiven,
         });
         platform.MainButton.hideProgress();
         platform.MainButton.hide();
@@ -650,7 +666,7 @@ async function init() {
             platform.MainButton.hide();
             platform.BackButton.hide();
         } else {
-            showStep(1);
+            showScreen('consent');
         }
     } catch (err) {
         logToServer('Auth failed: ' + err.message + ' | platform: ' + platform.name + ' | initData length: ' + initData.length);

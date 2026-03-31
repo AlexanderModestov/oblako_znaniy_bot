@@ -4,6 +4,7 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    DateTime,
     ForeignKey,
     Index,
     SmallInteger,
@@ -61,6 +62,8 @@ class User(Base):
     region_id: Mapped[int] = mapped_column(ForeignKey("regions.id"), nullable=False)
     school_id: Mapped[int | None] = mapped_column(ForeignKey("schools.id"), nullable=True)
     subjects: Mapped[list[int]] = mapped_column(ARRAY(SmallInteger), default=list)
+    consent_given: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 

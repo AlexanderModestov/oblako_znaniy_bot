@@ -2,7 +2,8 @@ import logging
 
 from maxapi import F, Router
 from maxapi.context import MemoryContext, State, StatesGroup
-from maxapi.types import BotStarted, MessageCallback, MessageCreated
+from maxapi.types import BotStarted, CallbackButton, MessageCallback, MessageCreated
+from maxapi.utils.inline_keyboard import InlineKeyboardBuilder
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,7 +23,16 @@ user_service = UserService()
 logger = logging.getLogger("max.start")
 
 
+CONSENT_TEXT = (
+    "Для регистрации нам необходимо обработать ваши персональные данные "
+    "(ФИО, телефон, email, регион, место работы).\n\n"
+    "Данные используются исключительно для работы сервиса и не передаются третьим лицам.\n\n"
+    "Нажмите «Согласен», чтобы продолжить регистрацию."
+)
+
+
 class OnboardingStates(StatesGroup):
+    consent = State()
     full_name = State()
     region = State()
     municipality = State()
@@ -58,11 +68,34 @@ async def on_bot_started(event: BotStarted, context: MemoryContext, session: Asy
             attachments=[kb.as_markup()],
         )
         return
-    await context.set_state(OnboardingStates.full_name)
+    await context.set_state(OnboardingStates.consent)
+    kb = InlineKeyboardBuilder()
+    kb.row(CallbackButton(text="Согласен", payload="onb_consent:yes"))
+    kb.row(CallbackButton(text="Не согласен", payload="onb_consent:no"))
     await event.bot.send_message(
         chat_id=event.chat_id,
-        text="Добро пожаловать! Давайте зарегистрируемся.\n\n"
-             "Введите ваше ФИО (Фамилия Имя Отчество) одним сообщением:",
+        text=CONSENT_TEXT,
+        attachments=[kb.as_markup()],
+    )
+
+
+@router.message_callback(F.callback.payload == "onb_consent:yes", OnboardingStates.consent)
+async def process_consent_yes(event: MessageCallback, context: MemoryContext):
+    await context.update_data(consent_given=True)
+    await context.set_state(OnboardingStates.full_name)
+    await event.bot.edit_message(
+        message_id=event.message.body.mid,
+        text="Введите ваше ФИО (Фамилия Имя Отчество) одним сообщением:",
+    )
+
+
+@router.message_callback(F.callback.payload == "onb_consent:no", OnboardingStates.consent)
+async def process_consent_no(event: MessageCallback, context: MemoryContext):
+    await context.clear()
+    await event.bot.edit_message(
+        message_id=event.message.body.mid,
+        text="Без согласия на обработку персональных данных использование сервиса невозможно.\n\n"
+             "Если передумаете — нажмите /start",
     )
 
 
@@ -274,6 +307,7 @@ async def _finish_onboarding(event, context: MemoryContext, session, max_user_id
             region_id=data["region_id"],
             school_id=data["school_id"],
             subjects=data.get("subjects", []),
+            consent_given=data.get("consent_given", False),
         )
         await user_service.create_user(session, user_data)
     except Exception as e:
