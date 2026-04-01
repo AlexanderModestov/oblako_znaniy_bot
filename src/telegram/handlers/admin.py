@@ -266,7 +266,7 @@ def _create_max_bot():
 async def _send_to_max_user(max_bot, user, max_kb):
     """Send broadcast consent message to a Max user."""
     await max_bot.send_message(
-        chat_id=user.max_user_id,
+        user_id=user.max_user_id,
         text=BROADCAST_CONSENT_TEXT,
         attachments=[max_kb.as_markup()],
     )
