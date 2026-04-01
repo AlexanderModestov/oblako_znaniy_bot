@@ -3,7 +3,8 @@ import hmac
 import json
 import logging
 import time
-from urllib.parse import unquote
+from operator import itemgetter
+from urllib.parse import parse_qsl, unquote
 
 from fastapi import Header, HTTPException
 
@@ -12,75 +13,62 @@ from src.config import get_settings
 logger = logging.getLogger(__name__)
 
 
-def _parse_init_data(init_data: str) -> tuple[dict[str, str], str | None]:
-    """Split initData query string manually using unquote (not unquote_plus).
+def _validate(init_data: str, bot_token: str) -> dict:
+    """Validate WebApp initData (Telegram & MAX use the same scheme).
 
-    parse_qs uses unquote_plus internally which converts '+' to space.
-    MAX/Telegram sign values with standard percent-decoding where '+' stays '+'.
-    This mismatch causes intermittent hash failures when initData contains '+'.
+    Implementation follows the official MAX documentation exactly:
+    https://dev.max.ru/docs/webapps/validation
     """
-    params = {}
-    check_hash = None
-    for pair in init_data.split("&"):
-        key, _, value = pair.partition("=")
-        if key == "hash":
-            check_hash = value
-        else:
-            params[key] = unquote(value)
-    return params, check_hash
+    # parse_qsl decodes values via unquote_plus and preserves blank values
+    params = dict(parse_qsl(init_data, keep_blank_values=True))
 
+    original_hash = params.pop("hash", None)
+    if not original_hash:
+        raise ValueError("hash missing")
 
-def _validate_hash(params: dict[str, str], check_hash: str, bot_token: str) -> None:
-    data_check_string = "\n".join(
-        sorted(f"{k}={v}" for k, v in params.items())
-    )
-    secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
-    computed_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    # Sort alphabetically, join as key=value with newlines
+    params_to_sign = sorted(params.items(), key=itemgetter(0))
+    launch_params = "\n".join(f"{k}={v}" for k, v in params_to_sign)
 
-    if not hmac.compare_digest(computed_hash, check_hash):
+    # HMAC-SHA256: secret = HMAC("WebAppData", token), hash = HMAC(secret, data)
+    secret_key = hmac.new(
+        key=b"WebAppData",
+        msg=bot_token.encode(),
+        digestmod=hashlib.sha256,
+    ).digest()
+    computed = hmac.new(
+        key=secret_key,
+        msg=launch_params.encode(),
+        digestmod=hashlib.sha256,
+    ).hexdigest()
+
+    if not hmac.compare_digest(computed, original_hash):
         raise ValueError("invalid hash")
+
+    # Check auth_date freshness (24 hours)
+    auth_date = int(params.get("auth_date", "0"))
+    if time.time() - auth_date > 86400:
+        raise ValueError("init_data expired")
+
+    user_data = json.loads(params["user"])
+    return user_data
 
 
 def validate_init_data(init_data: str, bot_token: str) -> dict:
-    """Validate Telegram WebApp initData and return parsed data."""
-    params, check_hash = _parse_init_data(init_data)
-
-    if not check_hash:
-        raise ValueError("hash missing")
-
-    _validate_hash(params, check_hash, bot_token)
-
-    auth_date = int(params.get("auth_date", "0"))
-    if time.time() - auth_date > 86400:
-        raise ValueError("init_data expired")
-
-    user_data = json.loads(params["user"])
-    return user_data
+    """Validate Telegram WebApp initData and return parsed user data."""
+    return _validate(init_data, bot_token)
 
 
 def validate_max_init_data(init_data: str, bot_token: str) -> dict:
-    """Validate MAX WebApp initData and return parsed data."""
-    params, check_hash = _parse_init_data(init_data)
-
-    if not check_hash:
-        raise ValueError("hash missing")
-
-    _validate_hash(params, check_hash, bot_token)
-
-    auth_date = int(params.get("auth_date", "0"))
-    if time.time() - auth_date > 86400:
-        raise ValueError("init_data expired")
-
-    user_data = json.loads(params["user"])
-    return user_data
+    """Validate MAX WebApp initData and return parsed user data."""
+    return _validate(init_data, bot_token)
 
 
 async def get_telegram_user(x_telegram_init_data: str = Header()) -> dict:
     """FastAPI dependency: validate initData header, return user dict with 'id' field."""
     try:
         settings = get_settings()
-        user_data = validate_init_data(x_telegram_init_data, settings.bot_token)
-        return user_data
+        return validate_init_data(x_telegram_init_data, settings.bot_token)
     except (ValueError, KeyError) as e:
         raise HTTPException(status_code=401, detail=str(e))
 
@@ -106,20 +94,21 @@ async def get_platform_user(
             user_data["platform"] = "max"
             return user_data
         except (ValueError, KeyError) as e:
-            params, check_hash = _parse_init_data(x_max_init_data)
-            data_check_string = "\n".join(
-                sorted(f"{k}={v}" for k, v in params.items())
-            )
-            secret_key = hmac.new(b"WebAppData", settings.max_bot_token.encode(), hashlib.sha256).digest()
-            computed = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+            # Debug logging
+            params = dict(parse_qsl(x_max_init_data, keep_blank_values=True))
+            received = params.pop("hash", None)
+            params_to_sign = sorted(params.items(), key=itemgetter(0))
+            launch_params = "\n".join(f"{k}={v}" for k, v in params_to_sign)
+            secret_key = hmac.new(key=b"WebAppData", msg=settings.max_bot_token.encode(), digestmod=hashlib.sha256).digest()
+            computed = hmac.new(key=secret_key, msg=launch_params.encode(), digestmod=hashlib.sha256).hexdigest()
             logger.error(
                 "Max initData validation failed: %s | initData keys: %s | computed: %s | received: %s | token_prefix: %s | data_check_string_preview: %s",
                 e,
                 list(params.keys()),
                 computed[:16],
-                check_hash[:16] if check_hash else "N/A",
+                received[:16] if received else "N/A",
                 settings.max_bot_token[:8] + "...",
-                data_check_string[:100],
+                launch_params[:100],
             )
             raise HTTPException(status_code=401, detail=str(e))
 
