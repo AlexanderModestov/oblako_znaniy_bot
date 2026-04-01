@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def validate_init_data(init_data: str, bot_token: str) -> dict:
     """Validate Telegram WebApp initData and return parsed data."""
-    parsed = parse_qs(init_data)
+    parsed = parse_qs(init_data, keep_blank_values=True)
 
     check_hash = parsed.get("hash", [None])[0]
     if not check_hash:
@@ -25,7 +25,7 @@ def validate_init_data(init_data: str, bot_token: str) -> dict:
     for key, values in parsed.items():
         if key == "hash":
             continue
-        items.append(f"{key}={unquote(values[0])}")
+        items.append(f"{key}={values[0]}")
     data_check_string = "\n".join(sorted(items))
 
     # HMAC-SHA256 validation
@@ -72,7 +72,7 @@ def validate_max_init_data(init_data: str, bot_token: str) -> dict:
     for key, values in parsed.items():
         if key == "hash":
             continue
-        items.append(f"{key}={unquote(values[0])}")
+        items.append(f"{key}={values[0]}")
     data_check_string = "\n".join(sorted(items))
 
     secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
@@ -111,12 +111,12 @@ async def get_platform_user(
             return user_data
         except (ValueError, KeyError) as e:
             # Debug: log data_check_string for troubleshooting
-            parsed = parse_qs(x_max_init_data)
+            parsed = parse_qs(x_max_init_data, keep_blank_values=True)
             items = []
             for key, values in parsed.items():
                 if key == "hash":
                     continue
-                items.append(f"{key}={unquote(values[0])}")
+                items.append(f"{key}={values[0]}")
             data_check_string = "\n".join(sorted(items))
             secret_key = hmac.new(b"WebAppData", settings.max_bot_token.encode(), hashlib.sha256).digest()
             computed = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()

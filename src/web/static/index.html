@@ -37,7 +37,7 @@
     <label class="consent-checkbox-label">
         <input type="checkbox" id="consent-checkbox">
         <span class="consent-checkmark"></span>
-        <span>Я согласен(-на) <a href="privacy.html" target="_blank" class="consent-link">с условиями обработки персональных данных</a></span>
+        <span>Я согласен(-на) <a href="privacy.html" class="consent-link" onclick="event.preventDefault(); openPrivacyLink();">с условиями обработки персональных данных</a></span>
     </label>
     <div class="consent-actions">
         <button type="button" id="btn-consent-yes" class="consent-btn consent-btn-yes" disabled>Продолжить</button>

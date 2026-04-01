@@ -125,6 +125,17 @@ if (isTelegram) {
     };
 }
 
+function openPrivacyLink() {
+    var url = new URL('privacy.html', location.href).toString();
+    if (isTelegram && tgWebApp.openLink) {
+        tgWebApp.openLink(url);
+    } else if (isMax && maxWebApp.openLink) {
+        maxWebApp.openLink(url);
+    } else {
+        window.open(url, '_blank');
+    }
+}
+
 var initData = platform.initData;
 var urlParams = new URLSearchParams(window.location.search);
 var botMessageId = urlParams.get('msg_id');
