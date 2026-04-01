@@ -179,8 +179,14 @@ var $btnSkip = document.getElementById('btn-skip');
 
 var $btnConsentYes = document.getElementById('btn-consent-yes');
 var $btnConsentNo = document.getElementById('btn-consent-no');
+var $consentCheckbox = document.getElementById('consent-checkbox');
+
+$consentCheckbox.addEventListener('change', function () {
+    $btnConsentYes.disabled = !this.checked;
+});
 
 $btnConsentYes.addEventListener('click', function () {
+    if (!$consentCheckbox.checked) return;
     consentGiven = true;
     showStep(1);
 });

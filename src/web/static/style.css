@@ -87,6 +87,58 @@ html, body {
     max-width: 340px;
 }
 
+.consent-checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    max-width: 340px;
+    font-size: 15px;
+    line-height: 1.5;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    text-align: left;
+    color: var(--tg-theme-text-color, #000000);
+}
+
+.consent-checkbox-label input[type="checkbox"] {
+    display: none;
+}
+
+.consent-checkmark {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    border: 2px solid var(--tg-theme-hint-color, #cccccc);
+    border-radius: 6px;
+    margin-top: 1px;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    position: relative;
+}
+
+.consent-checkbox-label input[type="checkbox"]:checked + .consent-checkmark {
+    background-color: var(--tg-theme-button-color, #3390ec);
+    border-color: var(--tg-theme-button-color, #3390ec);
+}
+
+.consent-checkbox-label input[type="checkbox"]:checked + .consent-checkmark::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 2px;
+    width: 6px;
+    height: 11px;
+    border: solid var(--tg-theme-button-text-color, #ffffff);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.consent-link {
+    color: var(--tg-theme-link-color, #3390ec);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
 .consent-actions {
     display: flex;
     flex-direction: column;
@@ -114,6 +166,11 @@ html, body {
 .consent-btn-yes {
     background-color: var(--tg-theme-button-color, #3390ec);
     color: var(--tg-theme-button-text-color, #ffffff);
+}
+
+.consent-btn-yes:disabled {
+    opacity: 0.4;
+    cursor: default;
 }
 
 .consent-btn-no {

@@ -34,15 +34,13 @@
 <!-- Consent screen -->
 <div id="consent" class="screen hidden">
     <h2>Согласие на обработку данных</h2>
-    <p class="consent-text">
-        Для регистрации нам необходимо обработать ваши персональные данные
-        (ФИО, телефон, email, регион, место работы).
-    </p>
-    <p class="consent-text">
-        Данные используются исключительно для работы сервиса и не передаются третьим лицам.
-    </p>
+    <label class="consent-checkbox-label">
+        <input type="checkbox" id="consent-checkbox">
+        <span class="consent-checkmark"></span>
+        <span>Я согласен(-на) <a href="privacy.html" target="_blank" class="consent-link">с условиями обработки персональных данных</a></span>
+    </label>
     <div class="consent-actions">
-        <button type="button" id="btn-consent-yes" class="consent-btn consent-btn-yes">Согласен</button>
+        <button type="button" id="btn-consent-yes" class="consent-btn consent-btn-yes" disabled>Продолжить</button>
         <button type="button" id="btn-consent-no" class="consent-btn consent-btn-no">Не согласен</button>
     </div>
 </div>
