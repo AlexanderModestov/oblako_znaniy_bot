@@ -5,6 +5,7 @@ from aiogram.types import CallbackQuery
 from src.config import get_settings
 from src.core.schemas import FilterState
 from src.core.services.content import ContentService
+from src.core.services.user import UserService
 from src.telegram.formatters import format_param_results, format_topic_lessons
 from src.telegram.keyboards import (
     grades_keyboard,
@@ -16,10 +17,19 @@ from src.telegram.keyboards import (
 
 router = Router()
 content_service = ContentService()
+user_service = UserService()
 
 
 @router.callback_query(F.data == "search_curriculum")
 async def start_param_search(callback: CallbackQuery, state: FSMContext, session):
+    user = await user_service.get_by_telegram_id(session, callback.from_user.id)
+    if user and not user.consent_given:
+        await callback.message.edit_text(
+            "Для использования поиска необходимо дать согласие на обработку персональных данных.\n\n"
+            "Нажмите /start, чтобы получить запрос на согласие повторно."
+        )
+        await callback.answer()
+        return
     subjects = await content_service.get_subjects(session)
     await state.update_data(filter={})
     await callback.message.edit_text(

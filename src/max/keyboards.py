@@ -126,3 +126,10 @@ def skip_keyboard() -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
     kb.row(CallbackButton(text="\u23ed Пропустить", payload="onb_skip"))
     return kb
+
+
+def broadcast_consent_keyboard() -> InlineKeyboardBuilder:
+    kb = InlineKeyboardBuilder()
+    kb.row(CallbackButton(text="Согласен", payload="broadcast_consent:yes"))
+    kb.row(CallbackButton(text="Не согласен", payload="broadcast_consent:no"))
+    return kb

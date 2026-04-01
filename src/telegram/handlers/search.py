@@ -43,6 +43,13 @@ async def handle_search(message: Message, state: FSMContext, session):
             )
         return
 
+    if not user.consent_given:
+        await message.answer(
+            "Для использования поиска необходимо дать согласие на обработку персональных данных.\n\n"
+            "Нажмите /start, чтобы получить запрос на согласие повторно."
+        )
+        return
+
     query = message.text.strip()
     if len(query) < 2:
         await message.answer("Слишком короткий запрос. Введите минимум 2 символа.")

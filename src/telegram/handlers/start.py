@@ -17,6 +17,7 @@ from src.config import get_settings
 from src.core.schemas import UserCreate
 from src.core.services.user import UserService
 from src.telegram.keyboards import (
+    broadcast_consent_keyboard,
     contact_keyboard,
     items_keyboard,
     paginated_items_keyboard,
@@ -55,6 +56,16 @@ async def cmd_start(message: Message, state: FSMContext, session):
     user = await user_service.get_by_telegram_id(session, message.from_user.id)
     if user:
         await state.clear()
+        if not user.consent_given:
+            await message.answer(
+                "Условия использования сервиса обновились.\n\n"
+                "Для продолжения работы нам необходимо ваше согласие на обработку "
+                "персональных данных (ФИО, телефон, email, регион, место работы).\n\n"
+                "Данные используются исключительно для работы сервиса и не передаются третьим лицам.\n\n"
+                "Пока согласие не принято, функция поиска недоступна.",
+                reply_markup=broadcast_consent_keyboard(),
+            )
+            return
         await message.answer(
             f"С возвращением, {user.full_name}!\n\n"
             "Выберите способ поиска:",
@@ -326,3 +337,34 @@ async def _finish_onboarding(message, state: FSMContext, session, telegram_id: i
         "Выберите способ поиска:",
         reply_markup=search_choice_keyboard(),
     )
+
+
+# --- Broadcast consent handlers ---
+
+
+@router.callback_query(F.data == "broadcast_consent:yes")
+async def broadcast_consent_yes(callback: CallbackQuery, session):
+    user = await user_service.get_by_telegram_id(session, callback.from_user.id)
+    if not user:
+        await callback.answer("Пользователь не найден.", show_alert=True)
+        return
+    if user.consent_given:
+        await callback.message.edit_text("Вы уже дали согласие. Можете пользоваться поиском.")
+        await callback.answer()
+        return
+    await user_service.grant_consent(session, user.id)
+    await callback.message.edit_text(
+        "Спасибо! Согласие принято.\n\n"
+        "Выберите способ поиска:",
+        reply_markup=search_choice_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "broadcast_consent:no")
+async def broadcast_consent_no(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "Без согласия на обработку персональных данных функция поиска недоступна.\n\n"
+        "Если передумаете — нажмите /start"
+    )
+    await callback.answer()

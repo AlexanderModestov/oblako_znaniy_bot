@@ -10,6 +10,7 @@ from src.config import get_settings
 from src.core.schemas import UserCreate
 from src.core.services.user import UserService
 from src.max.keyboards import (
+    broadcast_consent_keyboard,
     paginated_items_keyboard,
     registration_keyboard,
     search_choice_keyboard,
@@ -47,6 +48,18 @@ async def on_bot_started(event: BotStarted, context: MemoryContext, session: Asy
     user = await user_service.get_by_max_user_id(session, event.user.user_id)
     if user:
         await context.clear()
+        if not user.consent_given:
+            kb = broadcast_consent_keyboard()
+            await event.bot.send_message(
+                chat_id=event.chat_id,
+                text="Условия использования сервиса обновились.\n\n"
+                     "Для продолжения работы нам необходимо ваше согласие на обработку "
+                     "персональных данных (ФИО, телефон, email, регион, место работы).\n\n"
+                     "Данные используются исключительно для работы сервиса и не передаются третьим лицам.\n\n"
+                     "Пока согласие не принято, функция поиска недоступна.",
+                attachments=[kb.as_markup()],
+            )
+            return
         kb = search_choice_keyboard()
         await event.bot.send_message(
             chat_id=event.chat_id,
@@ -324,3 +337,36 @@ async def _finish_onboarding(event, context: MemoryContext, session, max_user_id
         await event.message.answer(success_msg, attachments=[kb.as_markup()])
     else:
         await event.answer(new_text=success_msg, new_attachments=[kb.as_markup()])
+
+
+# --- Broadcast consent handlers ---
+
+
+@router.message_callback(F.callback.payload == "broadcast_consent:yes")
+async def broadcast_consent_yes(event: MessageCallback, session: AsyncSession):
+    user = await user_service.get_by_max_user_id(session, event.callback.user.user_id)
+    if not user:
+        await event.answer(notification="Пользователь не найден.")
+        return
+    if user.consent_given:
+        await event.bot.edit_message(
+            message_id=event.message.body.mid,
+            text="Вы уже дали согласие. Можете пользоваться поиском.",
+        )
+        return
+    await user_service.grant_consent(session, user.id)
+    kb = search_choice_keyboard()
+    await event.bot.edit_message(
+        message_id=event.message.body.mid,
+        text="Спасибо! Согласие принято.\n\nВыберите способ поиска:",
+        attachments=[kb.as_markup()],
+    )
+
+
+@router.message_callback(F.callback.payload == "broadcast_consent:no")
+async def broadcast_consent_no(event: MessageCallback):
+    await event.bot.edit_message(
+        message_id=event.message.body.mid,
+        text="Без согласия на обработку персональных данных функция поиска недоступна.\n\n"
+             "Если передумаете — нажмите /start",
+    )

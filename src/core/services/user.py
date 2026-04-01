@@ -100,3 +100,26 @@ class UserService:
     async def get_user_count(self, session: AsyncSession) -> int:
         result = await session.execute(select(func.count(User.id)))
         return result.scalar() or 0
+
+    async def get_by_id(self, session: AsyncSession, user_id: int) -> User | None:
+        result = await session.execute(select(User).where(User.id == user_id))
+        return result.scalar_one_or_none()
+
+    async def get_users_without_consent(
+        self, session: AsyncSession, platform: str = "telegram",
+    ) -> list[User]:
+        id_col = User.telegram_id if platform == "telegram" else User.max_user_id
+        result = await session.execute(
+            select(User).where(
+                User.consent_given == False,  # noqa: E712
+                id_col.isnot(None),
+            )
+        )
+        return list(result.scalars().all())
+
+    async def grant_consent(self, session: AsyncSession, user_id: int) -> None:
+        user = await self.get_by_id(session, user_id)
+        if user:
+            user.consent_given = True
+            user.consent_at = datetime.now(timezone.utc)
+            await session.commit()

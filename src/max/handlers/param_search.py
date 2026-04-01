@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.config import get_settings
 from src.core.schemas import FilterState
 from src.core.services.content import ContentService
+from src.core.services.user import UserService
 from src.max.formatters import format_param_results, format_topic_lessons
 from src.max.keyboards import (
     grades_keyboard,
@@ -17,10 +18,19 @@ from src.max.keyboards import (
 
 router = Router(router_id="max_param_search")
 content_service = ContentService()
+user_service = UserService()
 
 
 @router.message_callback(F.callback.payload == "search_curriculum")
 async def start_param_search(event: MessageCallback, context: MemoryContext, session: AsyncSession):
+    user = await user_service.get_by_max_user_id(session, event.callback.user.user_id)
+    if user and not user.consent_given:
+        await event.bot.edit_message(
+            message_id=event.message.body.mid,
+            text="Для использования поиска необходимо дать согласие на обработку персональных данных.\n\n"
+                 "Нажмите /start, чтобы получить запрос на согласие повторно.",
+        )
+        return
     subjects = await content_service.get_subjects(session)
     await context.update_data(filter={})
     kb = items_keyboard(subjects, "ps_subj", back_callback="ps_back:menu")

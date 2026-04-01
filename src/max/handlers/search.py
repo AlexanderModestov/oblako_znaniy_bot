@@ -36,6 +36,13 @@ async def handle_search(event: MessageCreated, context: MemoryContext, session: 
             )
         return
 
+    if not user.consent_given:
+        await event.message.answer(
+            "Для использования поиска необходимо дать согласие на обработку персональных данных.\n\n"
+            "Нажмите /start, чтобы получить запрос на согласие повторно."
+        )
+        return
+
     query = event.message.body.text.strip()
     if len(query) < 2:
         await event.message.answer("Слишком короткий запрос. Введите минимум 2 символа.")

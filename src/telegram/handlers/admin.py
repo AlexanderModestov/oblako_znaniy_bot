@@ -17,6 +17,7 @@ from src.core.services.loader import (
     reload_topics_data,
 )
 from src.core.services.user import UserService
+from src.telegram.keyboards import broadcast_consent_keyboard
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -242,6 +243,125 @@ async def cmd_reload_lessons(message: Message, session):
         return
 
     await message.answer("\u2705 Загрузка контента завершена!")
+
+
+BROADCAST_CONSENT_TEXT = (
+    "Условия использования сервиса обновились.\n\n"
+    "Для продолжения работы нам необходимо ваше согласие на обработку "
+    "персональных данных (ФИО, телефон, email, регион, место работы).\n\n"
+    "Данные используются исключительно для работы сервиса и не передаются третьим лицам.\n\n"
+    "Пока согласие не принято, функция поиска недоступна."
+)
+
+
+def _create_max_bot():
+    """Create Max bot instance for broadcast. Returns None if Max is not configured."""
+    settings = get_settings()
+    if not settings.enable_max or not settings.max_bot_token:
+        return None
+    from maxapi import Bot as MaxBot
+    return MaxBot(token=settings.max_bot_token)
+
+
+async def _send_to_max_user(max_bot, user, max_kb):
+    """Send broadcast consent message to a Max user."""
+    await max_bot.send_message(
+        chat_id=user.max_user_id,
+        text=BROADCAST_CONSENT_TEXT,
+        attachments=[max_kb.as_markup()],
+    )
+
+
+@router.message(Command("broadcast"))
+async def cmd_broadcast(message: Message, session):
+    if not is_admin(message.from_user.id):
+        await message.answer("У вас нет прав для этой команды.")
+        return
+
+    max_bot = _create_max_bot()
+
+    args = message.text.split(maxsplit=1)
+    # /broadcast <id> — send to specific user
+    if len(args) > 1:
+        try:
+            target_user_id = int(args[1].strip())
+        except ValueError:
+            await message.answer("Неверный формат. Используйте: /broadcast <id>")
+            return
+
+        user = await user_service.get_by_id(session, target_user_id)
+        if not user:
+            await message.answer(f"Пользователь с id={target_user_id} не найден.")
+            return
+        if user.consent_given:
+            await message.answer(f"Пользователь {user.full_name} (id={user.id}) уже дал согласие.")
+            return
+        if not user.telegram_id and not user.max_user_id:
+            await message.answer(f"У пользователя {user.full_name} (id={user.id}) нет ни telegram_id, ни max_user_id.")
+            return
+
+        results = []
+        if user.telegram_id:
+            try:
+                await message.bot.send_message(
+                    user.telegram_id,
+                    BROADCAST_CONSENT_TEXT,
+                    reply_markup=broadcast_consent_keyboard(),
+                )
+                results.append("Telegram: OK")
+            except Exception as e:
+                results.append(f"Telegram: {_short_error(e)}")
+        if user.max_user_id and max_bot:
+            try:
+                from src.max.keyboards import broadcast_consent_keyboard as max_broadcast_kb
+                await _send_to_max_user(max_bot, user, max_broadcast_kb())
+                results.append("Max: OK")
+            except Exception as e:
+                results.append(f"Max: {_short_error(e)}")
+
+        await message.answer(
+            f"Пользователь {user.full_name} (id={user.id}):\n" + "\n".join(results)
+        )
+        return
+
+    # /broadcast — send to all users without consent
+    tg_users = await user_service.get_users_without_consent(session, platform="telegram")
+    max_users = await user_service.get_users_without_consent(session, platform="max") if max_bot else []
+
+    if not tg_users and not max_users:
+        await message.answer("Все пользователи уже дали согласие.")
+        return
+
+    total = len(tg_users) + len(max_users)
+    await message.answer(f"\u23f3 Рассылка {total} пользователям (Telegram: {len(tg_users)}, Max: {len(max_users)})...")
+
+    sent = 0
+    failed = 0
+
+    for user in tg_users:
+        try:
+            await message.bot.send_message(
+                user.telegram_id,
+                BROADCAST_CONSENT_TEXT,
+                reply_markup=broadcast_consent_keyboard(),
+            )
+            sent += 1
+        except Exception as e:
+            failed += 1
+            logger.warning("Failed to send broadcast to user %s (telegram_id=%s): %s", user.id, user.telegram_id, e)
+
+    if max_users and max_bot:
+        from src.max.keyboards import broadcast_consent_keyboard as max_broadcast_kb
+        max_kb = max_broadcast_kb()
+        for user in max_users:
+            try:
+                await _send_to_max_user(max_bot, user, max_kb)
+                sent += 1
+            except Exception as e:
+                failed += 1
+                logger.warning("Failed to send broadcast to user %s (max_user_id=%s): %s", user.id, user.max_user_id, e)
+
+    await message.answer(f"\u2705 Рассылка завершена.\nОтправлено: {sent}\nОшибок: {failed}")
 
 
 @router.message(Command("stats"))

@@ -153,3 +153,10 @@ def skip_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="\u23ed Пропустить", callback_data="onb_skip")]
     ])
+
+
+def broadcast_consent_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Согласен", callback_data="broadcast_consent:yes")],
+        [InlineKeyboardButton(text="Не согласен", callback_data="broadcast_consent:no")],
+    ])
