@@ -2,8 +2,7 @@ import logging
 
 from maxapi import F, Router
 from maxapi.context import MemoryContext, State, StatesGroup
-from maxapi.types import BotStarted, CallbackButton, MessageCallback, MessageCreated
-from maxapi.utils.inline_keyboard import InlineKeyboardBuilder
+from maxapi.types import BotStarted, MessageCallback, MessageCreated
 
 from sqlalchemy.ext.asyncio import AsyncSession
 

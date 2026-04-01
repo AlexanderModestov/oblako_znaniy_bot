@@ -29,16 +29,12 @@ async def start_max():
     from src.max.handlers import register_all_routers
     from src.max.middlewares import DatabaseMiddleware
 
-    settings = get_settings()
     bot = create_max_bot()
     dp = create_max_dispatcher()
     dp.middleware(DatabaseMiddleware())
     register_all_routers(dp)
 
-    bot_info = await bot.get_me()
-    settings.max_bot_username = bot_info.username
-    settings.max_bot_id = bot_info.user_id
-    logger.info(f"MAX bot @{bot_info.username} (id={bot_info.user_id}) starting polling...")
+    logger.info("MAX bot starting polling...")
     await dp.start_polling(bot)
 
 
