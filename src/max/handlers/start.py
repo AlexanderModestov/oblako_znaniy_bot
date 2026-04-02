@@ -3,6 +3,7 @@ import logging
 from maxapi import F, Router
 from maxapi.context import MemoryContext, State, StatesGroup
 from maxapi.types import BotStarted, Command, MessageCallback, MessageCreated
+from maxapi.enums import ParseMode
 from maxapi.utils.formatting import Link, Text
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,7 +37,7 @@ def _broadcast_consent_text_md() -> tuple[str, str | None]:
             ", которые вы оставили при регистрации на старте.\n\n"
             "Пока согласие не принято, функция поиска будет приостановлена.",
         )
-        return msg.as_markdown(), "markdown"
+        return msg.as_markdown(), ParseMode.MARKDOWN
     return (
         "Мы обновили условия использования сервиса.\n\n"
         "Для продолжения работы вам необходимо принять согласие на обработку "
