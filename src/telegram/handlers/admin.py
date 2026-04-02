@@ -245,13 +245,23 @@ async def cmd_reload_lessons(message: Message, session):
     await message.answer("\u2705 Загрузка контента завершена!")
 
 
-BROADCAST_CONSENT_TEXT = (
-    "Условия использования сервиса обновились.\n\n"
-    "Для продолжения работы нам необходимо ваше согласие на обработку "
-    "персональных данных (ФИО, телефон, email, регион, место работы).\n\n"
-    "Данные используются исключительно для работы сервиса и не передаются третьим лицам.\n\n"
-    "Пока согласие не принято, функция поиска недоступна."
-)
+def _broadcast_consent_text(html: bool = False) -> str:
+    """Build broadcast consent text. html=True for Telegram (clickable link), False for MAX (plain URL)."""
+    settings = get_settings()
+    privacy_url = f"{settings.web_app_url}/privacy.html" if settings.web_app_url else ""
+    link_text = "согласие на обработку персональных данных"
+    if html and privacy_url:
+        link = f'<a href="{privacy_url}">{link_text}</a>'
+    elif privacy_url:
+        link = f"{link_text} ({privacy_url})"
+    else:
+        link = link_text
+    return (
+        f"Мы обновили условия использования сервиса.\n\n"
+        f"Для продолжения работы вам необходимо принять {link}, "
+        f"которые вы оставили при регистрации на старте.\n\n"
+        f"Пока согласие не принято, функция поиска будет приостановлена."
+    )
 
 
 def _create_max_bot():
@@ -267,7 +277,7 @@ async def _send_to_max_user(max_bot, user, max_kb):
     """Send broadcast consent message to a Max user."""
     await max_bot.send_message(
         user_id=user.max_user_id,
-        text=BROADCAST_CONSENT_TEXT,
+        text=_broadcast_consent_text(html=False),
         attachments=[max_kb.as_markup()],
     )
 
@@ -305,7 +315,8 @@ async def cmd_broadcast(message: Message, session):
             try:
                 await message.bot.send_message(
                     user.telegram_id,
-                    BROADCAST_CONSENT_TEXT,
+                    _broadcast_consent_text(html=True),
+                    parse_mode="HTML",
                     reply_markup=broadcast_consent_keyboard(),
                 )
                 results.append("Telegram: OK")
@@ -342,7 +353,8 @@ async def cmd_broadcast(message: Message, session):
         try:
             await message.bot.send_message(
                 user.telegram_id,
-                BROADCAST_CONSENT_TEXT,
+                _broadcast_consent_text(html=True),
+                parse_mode="HTML",
                 reply_markup=broadcast_consent_keyboard(),
             )
             sent += 1

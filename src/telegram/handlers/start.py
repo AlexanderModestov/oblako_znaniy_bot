@@ -57,12 +57,16 @@ async def cmd_start(message: Message, state: FSMContext, session):
     if user:
         await state.clear()
         if not user.consent_given:
+            settings = get_settings()
+            privacy_url = f"{settings.web_app_url}/privacy.html" if settings.web_app_url else ""
+            link_text = "согласие на обработку персональных данных"
+            link = f'<a href="{privacy_url}">{link_text}</a>' if privacy_url else link_text
             await message.answer(
-                "Условия использования сервиса обновились.\n\n"
-                "Для продолжения работы нам необходимо ваше согласие на обработку "
-                "персональных данных (ФИО, телефон, email, регион, место работы).\n\n"
-                "Данные используются исключительно для работы сервиса и не передаются третьим лицам.\n\n"
-                "Пока согласие не принято, функция поиска недоступна.",
+                f"Мы обновили условия использования сервиса.\n\n"
+                f"Для продолжения работы вам необходимо принять {link}, "
+                f"которые вы оставили при регистрации на старте.\n\n"
+                f"Пока согласие не принято, функция поиска будет приостановлена.",
+                parse_mode="HTML",
                 reply_markup=broadcast_consent_keyboard(),
             )
             return

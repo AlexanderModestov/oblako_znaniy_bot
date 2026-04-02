@@ -50,13 +50,15 @@ async def on_bot_started(event: BotStarted, context: MemoryContext, session: Asy
         await context.clear()
         if not user.consent_given:
             kb = broadcast_consent_keyboard()
+            privacy_url = f"{settings.web_app_url}/privacy.html" if settings.web_app_url else ""
+            link_text = "согласие на обработку персональных данных"
+            link = f"{link_text} ({privacy_url})" if privacy_url else link_text
             await event.bot.send_message(
                 chat_id=event.chat_id,
-                text="Условия использования сервиса обновились.\n\n"
-                     "Для продолжения работы нам необходимо ваше согласие на обработку "
-                     "персональных данных (ФИО, телефон, email, регион, место работы).\n\n"
-                     "Данные используются исключительно для работы сервиса и не передаются третьим лицам.\n\n"
-                     "Пока согласие не принято, функция поиска недоступна.",
+                text=f"Мы обновили условия использования сервиса.\n\n"
+                     f"Для продолжения работы вам необходимо принять {link}, "
+                     f"которые вы оставили при регистрации на старте.\n\n"
+                     f"Пока согласие не принято, функция поиска будет приостановлена.",
                 attachments=[kb.as_markup()],
             )
             return
