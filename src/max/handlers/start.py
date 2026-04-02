@@ -61,6 +61,7 @@ async def on_bot_started(event: BotStarted, context: MemoryContext, session: Asy
                      f"которые вы оставили при регистрации на старте.\n\n"
                      f"Пока согласие не принято, функция поиска будет приостановлена.",
                 attachments=[kb.as_markup()],
+                disable_link_preview=True,
             )
             return
         kb = search_choice_keyboard()
@@ -123,6 +124,7 @@ async def cmd_start(event: MessageCreated, context: MemoryContext, session: Asyn
             f"которые вы оставили при регистрации на старте.\n\n"
             f"Пока согласие не принято, функция поиска будет приостановлена.",
             attachments=[kb.as_markup()],
+            disable_link_preview=True,
         )
         return
     kb = search_choice_keyboard()

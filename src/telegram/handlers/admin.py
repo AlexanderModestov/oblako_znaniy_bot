@@ -279,6 +279,7 @@ async def _send_to_max_user(max_bot, user, max_kb):
         user_id=user.max_user_id,
         text=_broadcast_consent_text(html=False),
         attachments=[max_kb.as_markup()],
+        disable_link_preview=True,
     )
 
 
