@@ -2,7 +2,7 @@ import logging
 
 from maxapi import F, Router
 from maxapi.context import MemoryContext, State, StatesGroup
-from maxapi.types import BotStarted, MessageCallback, MessageCreated
+from maxapi.types import BotStarted, Command, MessageCallback, MessageCreated
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -90,6 +90,44 @@ async def on_bot_started(event: BotStarted, context: MemoryContext, session: Asy
     await event.bot.send_message(
         chat_id=event.chat_id,
         text=CONSENT_TEXT,
+        attachments=[kb.as_markup()],
+    )
+
+
+@router.message_created(Command("start"))
+async def cmd_start(event: MessageCreated, context: MemoryContext, session: AsyncSession):
+    """Handle /start command for returning users (bot_started only fires on first launch)."""
+    user = await user_service.get_by_max_user_id(session, event.message.sender.user_id)
+    if not user:
+        settings = get_settings()
+        if settings.web_app_url and settings.max_bot_username:
+            kb = registration_keyboard(
+                bot_username=settings.max_bot_username,
+                bot_contact_id=settings.max_bot_id or None,
+            )
+            await event.message.answer(
+                "Добро пожаловать! Для начала работы пройдите регистрацию:",
+                attachments=[kb.as_markup()],
+            )
+        return
+    await context.clear()
+    if not user.consent_given:
+        kb = broadcast_consent_keyboard()
+        settings = get_settings()
+        privacy_url = f"{settings.web_app_url}/privacy.html" if settings.web_app_url else ""
+        link_text = "согласие на обработку персональных данных"
+        link = f"{link_text} ({privacy_url})" if privacy_url else link_text
+        await event.message.answer(
+            f"Мы обновили условия использования сервиса.\n\n"
+            f"Для продолжения работы вам необходимо принять {link}, "
+            f"которые вы оставили при регистрации на старте.\n\n"
+            f"Пока согласие не принято, функция поиска будет приостановлена.",
+            attachments=[kb.as_markup()],
+        )
+        return
+    kb = search_choice_keyboard()
+    await event.message.answer(
+        f"С возвращением, {user.full_name}!\n\nВыберите способ поиска:",
         attachments=[kb.as_markup()],
     )
 
