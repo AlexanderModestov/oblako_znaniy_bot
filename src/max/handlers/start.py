@@ -3,6 +3,7 @@ import logging
 from maxapi import F, Router
 from maxapi.context import MemoryContext, State, StatesGroup
 from maxapi.types import BotStarted, Command, MessageCallback, MessageCreated
+from maxapi.utils.formatting import Link, Text
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +22,27 @@ from src.max.keyboards import (
 router = Router(router_id="max_start")
 user_service = UserService()
 logger = logging.getLogger("max.start")
+
+
+def _broadcast_consent_text_md() -> tuple[str, str | None]:
+    """Return (text, parse_mode) for the broadcast consent message."""
+    settings = get_settings()
+    privacy_url = f"{settings.web_app_url}/privacy.html" if settings.web_app_url else ""
+    if privacy_url:
+        msg = Text(
+            "Мы обновили условия использования сервиса.\n\n"
+            "Для продолжения работы вам необходимо принять ",
+            Link("согласие на обработку персональных данных", url=privacy_url),
+            ", которые вы оставили при регистрации на старте.\n\n"
+            "Пока согласие не принято, функция поиска будет приостановлена.",
+        )
+        return msg.as_markdown(), "markdown"
+    return (
+        "Мы обновили условия использования сервиса.\n\n"
+        "Для продолжения работы вам необходимо принять согласие на обработку "
+        "персональных данных, которые вы оставили при регистрации на старте.\n\n"
+        "Пока согласие не принято, функция поиска будет приостановлена."
+    ), None
 
 
 CONSENT_TEXT = (
@@ -50,17 +72,11 @@ async def on_bot_started(event: BotStarted, context: MemoryContext, session: Asy
         await context.clear()
         if not user.consent_given:
             kb = broadcast_consent_keyboard()
-            settings = get_settings()
-            privacy_url = f"{settings.web_app_url}/privacy.html" if settings.web_app_url else ""
-            link_text = "согласие на обработку персональных данных"
-            link = f"[{link_text}]({privacy_url})" if privacy_url else link_text
+            text, pm = _broadcast_consent_text_md()
             await event.bot.send_message(
                 chat_id=event.chat_id,
-                text=f"Мы обновили условия использования сервиса.\n\n"
-                     f"Для продолжения работы вам необходимо принять {link}, "
-                     f"которые вы оставили при регистрации на старте.\n\n"
-                     f"Пока согласие не принято, функция поиска будет приостановлена.",
-                parse_mode="markdown",
+                text=text,
+                parse_mode=pm,
                 attachments=[kb.as_markup()],
                 disable_link_preview=True,
             )
@@ -115,16 +131,10 @@ async def cmd_start(event: MessageCreated, context: MemoryContext, session: Asyn
     await context.clear()
     if not user.consent_given:
         kb = broadcast_consent_keyboard()
-        settings = get_settings()
-        privacy_url = f"{settings.web_app_url}/privacy.html" if settings.web_app_url else ""
-        link_text = "согласие на обработку персональных данных"
-        link = f"[{link_text}]({privacy_url})" if privacy_url else link_text
+        text, pm = _broadcast_consent_text_md()
         await event.message.answer(
-            f"Мы обновили условия использования сервиса.\n\n"
-            f"Для продолжения работы вам необходимо принять {link}, "
-            f"которые вы оставили при регистрации на старте.\n\n"
-            f"Пока согласие не принято, функция поиска будет приостановлена.",
-            parse_mode="markdown",
+            text,
+            parse_mode=pm,
             attachments=[kb.as_markup()],
             disable_link_preview=True,
         )

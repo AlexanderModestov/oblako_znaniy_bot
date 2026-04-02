@@ -246,14 +246,22 @@ async def cmd_reload_lessons(message: Message, session):
 
 
 def _broadcast_consent_text(fmt: str = "plain") -> str:
-    """Build broadcast consent text. fmt: 'html' for Telegram, 'markdown' for MAX, 'plain' as fallback."""
+    """Build broadcast consent text. fmt: 'html' for Telegram, 'max' for MAX, 'plain' as fallback."""
     settings = get_settings()
     privacy_url = f"{settings.web_app_url}/privacy.html" if settings.web_app_url else ""
     link_text = "согласие на обработку персональных данных"
     if fmt == "html" and privacy_url:
         link = f'<a href="{privacy_url}">{link_text}</a>'
-    elif fmt == "markdown" and privacy_url:
-        link = f"[{link_text}]({privacy_url})"
+    elif fmt == "max" and privacy_url:
+        from maxapi.utils.formatting import Link, Text
+        msg = Text(
+            "Мы обновили условия использования сервиса.\n\n"
+            "Для продолжения работы вам необходимо принять ",
+            Link(link_text, url=privacy_url),
+            ", которые вы оставили при регистрации на старте.\n\n"
+            "Пока согласие не принято, функция поиска будет приостановлена.",
+        )
+        return msg.as_markdown()
     else:
         link = link_text
     return (
@@ -277,7 +285,7 @@ async def _send_to_max_user(max_bot, user, max_kb):
     """Send broadcast consent message to a Max user."""
     await max_bot.send_message(
         user_id=user.max_user_id,
-        text=_broadcast_consent_text(fmt="markdown"),
+        text=_broadcast_consent_text(fmt="max"),
         parse_mode="markdown",
         attachments=[max_kb.as_markup()],
         disable_link_preview=True,
