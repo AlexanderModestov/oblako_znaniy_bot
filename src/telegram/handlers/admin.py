@@ -245,15 +245,15 @@ async def cmd_reload_lessons(message: Message, session):
     await message.answer("\u2705 Загрузка контента завершена!")
 
 
-def _broadcast_consent_text(html: bool = False) -> str:
-    """Build broadcast consent text. html=True for Telegram (clickable link), False for MAX (plain URL)."""
+def _broadcast_consent_text(fmt: str = "plain") -> str:
+    """Build broadcast consent text. fmt: 'html' for Telegram, 'markdown' for MAX, 'plain' as fallback."""
     settings = get_settings()
     privacy_url = f"{settings.web_app_url}/privacy.html" if settings.web_app_url else ""
     link_text = "согласие на обработку персональных данных"
-    if html and privacy_url:
+    if fmt == "html" and privacy_url:
         link = f'<a href="{privacy_url}">{link_text}</a>'
-    elif privacy_url:
-        link = f"{link_text} ({privacy_url})"
+    elif fmt == "markdown" and privacy_url:
+        link = f"[{link_text}]({privacy_url})"
     else:
         link = link_text
     return (
@@ -277,7 +277,8 @@ async def _send_to_max_user(max_bot, user, max_kb):
     """Send broadcast consent message to a Max user."""
     await max_bot.send_message(
         user_id=user.max_user_id,
-        text=_broadcast_consent_text(html=False),
+        text=_broadcast_consent_text(fmt="markdown"),
+        parse_mode="markdown",
         attachments=[max_kb.as_markup()],
         disable_link_preview=True,
     )
@@ -316,7 +317,7 @@ async def cmd_broadcast(message: Message, session):
             try:
                 await message.bot.send_message(
                     user.telegram_id,
-                    _broadcast_consent_text(html=True),
+                    _broadcast_consent_text(fmt="html"),
                     parse_mode="HTML",
                     reply_markup=broadcast_consent_keyboard(),
                 )
@@ -354,7 +355,7 @@ async def cmd_broadcast(message: Message, session):
         try:
             await message.bot.send_message(
                 user.telegram_id,
-                _broadcast_consent_text(html=True),
+                _broadcast_consent_text(fmt="html"),
                 parse_mode="HTML",
                 reply_markup=broadcast_consent_keyboard(),
             )

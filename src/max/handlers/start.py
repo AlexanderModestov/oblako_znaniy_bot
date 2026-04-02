@@ -53,13 +53,14 @@ async def on_bot_started(event: BotStarted, context: MemoryContext, session: Asy
             settings = get_settings()
             privacy_url = f"{settings.web_app_url}/privacy.html" if settings.web_app_url else ""
             link_text = "согласие на обработку персональных данных"
-            link = f"{link_text} ({privacy_url})" if privacy_url else link_text
+            link = f"[{link_text}]({privacy_url})" if privacy_url else link_text
             await event.bot.send_message(
                 chat_id=event.chat_id,
                 text=f"Мы обновили условия использования сервиса.\n\n"
                      f"Для продолжения работы вам необходимо принять {link}, "
                      f"которые вы оставили при регистрации на старте.\n\n"
                      f"Пока согласие не принято, функция поиска будет приостановлена.",
+                parse_mode="markdown",
                 attachments=[kb.as_markup()],
                 disable_link_preview=True,
             )
@@ -117,12 +118,13 @@ async def cmd_start(event: MessageCreated, context: MemoryContext, session: Asyn
         settings = get_settings()
         privacy_url = f"{settings.web_app_url}/privacy.html" if settings.web_app_url else ""
         link_text = "согласие на обработку персональных данных"
-        link = f"{link_text} ({privacy_url})" if privacy_url else link_text
+        link = f"[{link_text}]({privacy_url})" if privacy_url else link_text
         await event.message.answer(
             f"Мы обновили условия использования сервиса.\n\n"
             f"Для продолжения работы вам необходимо принять {link}, "
             f"которые вы оставили при регистрации на старте.\n\n"
             f"Пока согласие не принято, функция поиска будет приостановлена.",
+            parse_mode="markdown",
             attachments=[kb.as_markup()],
             disable_link_preview=True,
         )
