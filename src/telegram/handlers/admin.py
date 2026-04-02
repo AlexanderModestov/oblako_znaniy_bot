@@ -5,7 +5,7 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from maxapi.enums import ParseMode
+from maxapi.enums.parse_mode import ParseMode
 
 from src.config import get_settings
 from src.core.services.loader import (

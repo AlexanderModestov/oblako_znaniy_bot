@@ -3,7 +3,7 @@ import logging
 from maxapi import F, Router
 from maxapi.context import MemoryContext, State, StatesGroup
 from maxapi.types import BotStarted, Command, MessageCallback, MessageCreated
-from maxapi.enums import ParseMode
+from maxapi.enums.parse_mode import ParseMode
 from maxapi.utils.formatting import Link, Text
 
 from sqlalchemy.ext.asyncio import AsyncSession
