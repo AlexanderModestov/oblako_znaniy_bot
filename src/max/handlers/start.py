@@ -50,6 +50,7 @@ async def on_bot_started(event: BotStarted, context: MemoryContext, session: Asy
         await context.clear()
         if not user.consent_given:
             kb = broadcast_consent_keyboard()
+            settings = get_settings()
             privacy_url = f"{settings.web_app_url}/privacy.html" if settings.web_app_url else ""
             link_text = "согласие на обработку персональных данных"
             link = f"{link_text} ({privacy_url})" if privacy_url else link_text
