@@ -27,6 +27,7 @@ class LessonResult(BaseModel):
     url: str
     description: str | None = None
     subject: str | None = None
+    grade: int | None = None
     section: str | None = None
     topic: str | None = None
     is_semantic: bool = False
