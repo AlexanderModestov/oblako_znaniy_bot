@@ -3,17 +3,29 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
 from src.config import get_settings
-from src.core.schemas import FilterState
+from src.core.schemas import FilterState, SearchResult
 from src.core.services.content import ContentService
 from src.core.services.user import UserService
-from src.telegram.formatters import format_param_results, format_topic_lessons
+from src.telegram.formatters import format_text_results
 from src.telegram.keyboards import (
     grades_keyboard,
     items_keyboard,
-    new_search_keyboard,
     pagination_keyboard,
     search_choice_keyboard,
 )
+
+
+def _build_param_query(filters: FilterState, subject_name: str | None) -> str:
+    parts = []
+    if subject_name:
+        parts.append(subject_name)
+    if filters.grade:
+        parts.append(f"{filters.grade} класс")
+    if filters.section:
+        parts.append(filters.section)
+    if filters.topic:
+        parts.append(filters.topic)
+    return ", ".join(parts) if parts else "Поиск"
 
 router = Router()
 content_service = ContentService()
@@ -186,21 +198,20 @@ async def _show_results(callback, state, session, page=1):
     data = await state.get_data()
     filters = FilterState(**data["filter"])
 
-    # If topic is selected, show all lessons at once
-    if filters.topic:
-        lessons = await content_service.get_all_lessons(session, filters)
-        text = format_topic_lessons(lessons)
-        await callback.message.edit_text(text, reply_markup=new_search_keyboard())
-        return
-
     per_page = get_settings().results_per_page
     lessons, total = await content_service.get_lessons(session, filters, page=page, per_page=per_page)
 
-    text = format_param_results(lessons)
-    total_pages = -(-total // per_page)  # ceil division
+    subject_name = lessons[0].subject if lessons else None
+    query = _build_param_query(filters, subject_name)
+
+    result = SearchResult(
+        query=query, lessons=lessons,
+        total=total, page=page, per_page=per_page,
+    )
+    text = format_text_results(result)
 
     keyboard = None
-    if total_pages > 0:
-        keyboard = pagination_keyboard(page, total_pages, "ps_results")
+    if result.total_pages > 0:
+        keyboard = pagination_keyboard(page, result.total_pages, "ps_results")
 
     await callback.message.edit_text(text, reply_markup=keyboard)

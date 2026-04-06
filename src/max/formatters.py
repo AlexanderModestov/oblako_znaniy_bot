@@ -9,13 +9,6 @@ def _url_line(url: str, indent: str = "") -> str:
     return f"{indent}\u2192 {url}"
 
 
-def format_lesson_param(lesson: LessonResult) -> str:
-    return (
-        f"\U0001f4da {lesson.title}\n"
-        f"{_url_line(lesson.url)}"
-    )
-
-
 def format_lesson_text(lesson: LessonResult, index: int) -> str:
     semantic_mark = "\U0001f916 " if lesson.is_semantic else ""
     grade_str = f"{lesson.grade} класс" if lesson.grade else None
@@ -26,25 +19,6 @@ def format_lesson_text(lesson: LessonResult, index: int) -> str:
         f"   \U0001f4da {lesson.title}\n"
         f"{_url_line(lesson.url, '   ')}"
     )
-
-
-def format_param_results(lessons: list[LessonResult]) -> str:
-    if not lessons:
-        return "Ничего не найдено. Попробуйте изменить параметры поиска."
-    return "\n\n".join(format_lesson_param(l) for l in lessons)
-
-
-def format_topic_lessons(lessons: list[LessonResult]) -> str:
-    if not lessons:
-        return "В данной теме пока нет уроков."
-    first = lessons[0]
-    parts = [p for p in [first.subject, first.section, first.topic] if p]
-    header = " | ".join(parts)
-    items = "\n\n".join(
-        f"{i}. \U0001f4da {l.title}\n{_url_line(l.url, '   ')}"
-        for i, l in enumerate(lessons, 1)
-    )
-    return f"\U0001f4cb {header}\n\nУроки ({len(lessons)}):\n\n{items}"
 
 
 def format_text_results(result: SearchResult) -> str:

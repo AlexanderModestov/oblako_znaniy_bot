@@ -66,6 +66,7 @@ class ContentService:
                 url=l.url,
                 description=l.description,
                 subject=l.subject.name,
+                grade=l.grade,
                 section=l.section,
                 topic=l.topic,
             )
@@ -105,6 +106,7 @@ class ContentService:
                 url=l.url,
                 description=l.description,
                 subject=l.subject.name,
+                grade=l.grade,
                 section=l.section,
                 topic=l.topic,
             )

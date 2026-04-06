@@ -4,17 +4,29 @@ from maxapi.types import MessageCallback
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
-from src.core.schemas import FilterState
+from src.core.schemas import FilterState, SearchResult
 from src.core.services.content import ContentService
 from src.core.services.user import UserService
-from src.max.formatters import format_param_results, format_topic_lessons
+from src.max.formatters import format_text_results
 from src.max.keyboards import (
     grades_keyboard,
     items_keyboard,
-    new_search_keyboard,
     pagination_keyboard,
     search_choice_keyboard,
 )
+
+
+def _build_param_query(filters: FilterState, subject_name: str | None) -> str:
+    parts = []
+    if subject_name:
+        parts.append(subject_name)
+    if filters.grade:
+        parts.append(f"{filters.grade} класс")
+    if filters.section:
+        parts.append(filters.section)
+    if filters.topic:
+        parts.append(filters.topic)
+    return ", ".join(parts) if parts else "Поиск"
 
 router = Router(router_id="max_param_search")
 content_service = ContentService()
@@ -189,26 +201,20 @@ async def _show_results(event: MessageCallback, context: MemoryContext, session,
     data = await context.get_data()
     filters = FilterState(**data["filter"])
 
-    # If topic is selected, show all lessons at once
-    if filters.topic:
-        lessons = await content_service.get_all_lessons(session, filters)
-        text = format_topic_lessons(lessons)
-        kb = new_search_keyboard()
-        await event.bot.edit_message(
-            message_id=event.message.body.mid,
-            text=text,
-            attachments=[kb.as_markup()],
-        )
-        return
-
     per_page = get_settings().results_per_page
     lessons, total = await content_service.get_lessons(session, filters, page=page, per_page=per_page)
 
-    text = format_param_results(lessons)
-    total_pages = -(-total // per_page)
+    subject_name = lessons[0].subject if lessons else None
+    query = _build_param_query(filters, subject_name)
 
-    if total_pages > 0:
-        kb = pagination_keyboard(page, total_pages, "ps_results")
+    result = SearchResult(
+        query=query, lessons=lessons,
+        total=total, page=page, per_page=per_page,
+    )
+    text = format_text_results(result)
+
+    if result.total_pages > 0:
+        kb = pagination_keyboard(page, result.total_pages, "ps_results")
         await event.bot.edit_message(
             message_id=event.message.body.mid,
             text=text,
