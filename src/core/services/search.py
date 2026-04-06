@@ -7,7 +7,7 @@ from sqlalchemy.orm import joinedload
 
 from src.config import get_settings
 from src.core.models import Lesson
-from src.core.schemas import ClarifyQuestion, LessonResult, SearchResult
+from src.core.schemas import ClarifyOption, ClarifyResult, LessonResult, SearchResult
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
 from unittest.mock import patch, MagicMock
 
-from src.core.schemas import LessonResult, ClarifyQuestion
+from src.core.schemas import LessonResult, ClarifyOption, ClarifyResult
 from src.core.services.search import SearchService, _build_tsquery
 
 

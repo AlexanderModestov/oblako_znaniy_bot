@@ -45,11 +45,17 @@ class SearchResult(BaseModel):
         return math.ceil(self.total / self.per_page) if self.total > 0 else 0
 
 
-class ClarifyQuestion(BaseModel):
-    stage: str              # "subject" or "topic"
-    dominant_value: str     # e.g. "Математика"
-    total: int              # total results count
-    message: str            # question text for user
+class ClarifyOption(BaseModel):
+    value: str          # e.g. "Математика", "5", "Тема 1: Функции"
+    display: str        # button text, e.g. "Математика (15)"
+    count: int          # number of results
+
+
+class ClarifyResult(BaseModel):
+    level: str          # "subject", "grade", or "topic"
+    options: list[ClarifyOption]
+    message: str        # question text for user
+    total: int          # total results count
 
 
 class FilterState(BaseModel):
