@@ -2,7 +2,8 @@ import pytest
 from pydantic import ValidationError
 
 from src.core.schemas import (
-    ClarifyQuestion,
+    ClarifyOption,
+    ClarifyResult,
     LessonResult,
     SearchResult,
     UserCreate,
@@ -81,18 +82,19 @@ def test_filter_state_defaults():
     state = FilterState()
     assert state.subject_id is None
     assert state.grade is None
-    assert state.course_id is None
     assert state.section is None
     assert state.topic is None
 
 
-def test_clarify_question_schema():
-    q = ClarifyQuestion(
-        stage="subject",
-        dominant_value="Математика",
+def test_clarify_result_schema():
+    option = ClarifyOption(value="Математика", display="Математика (25)", count=25)
+    result = ClarifyResult(
+        level="subject",
+        options=[option],
+        message="Найдено 25 результатов. Выберите предмет:",
         total=25,
-        message="Найдено 25 результатов. Показать уроки по Математике? Или все найденные?",
     )
-    assert q.stage == "subject"
-    assert q.dominant_value == "Математика"
-    assert q.total == 25
+    assert result.level == "subject"
+    assert result.options[0].value == "Математика"
+    assert result.options[0].count == 25
+    assert result.total == 25
