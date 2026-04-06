@@ -4,7 +4,7 @@ from maxapi.types import MessageCallback, MessageCreated
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
-from src.core.schemas import LessonResult, SearchResult
+from src.core.schemas import ClarifyResult, LessonResult, SearchResult
 from src.core.services.search import SearchService
 from src.core.services.user import UserService
 from src.max.formatters import format_text_results
@@ -55,15 +55,15 @@ async def handle_search(event: MessageCreated, context: MemoryContext, session: 
     # Check if clarification might be needed
     if result.total > search_service.clarify_threshold:
         all_lessons = await search_service.fts_search_all(session, query)
-        clarification = search_service.check_clarification(all_lessons, stage="subject")
+        clarification = search_service.check_clarification(all_lessons)
         if clarification:
             await context.update_data(
                 search_results=[l.model_dump() for l in all_lessons],
                 search_total=result.total,
-                clarify_stage="subject",
-                clarify_dominant=clarification.dominant_value,
+                clarify_result=clarification.model_dump(),
             )
-            kb = clarify_keyboard(clarification.dominant_value)
+            options = [o.model_dump() for o in clarification.options]
+            kb = clarify_keyboard(options, clarification.level)
             await event.message.answer(clarification.message, attachments=[kb.as_markup()])
             return
 
@@ -77,39 +77,43 @@ async def handle_search(event: MessageCreated, context: MemoryContext, session: 
 
 @router.message_callback(F.callback.payload.startswith("clarify:"))
 async def handle_clarification(event: MessageCallback, context: MemoryContext, session: AsyncSession):
-    choice = event.callback.payload.split(":")[1]  # "dominant" or "all"
-    data = await context.get_data()
+    parts = event.callback.payload.split(":")  # clarify:{level}:{index_or_all}
+    level = parts[1]
+    choice = parts[2]
 
+    data = await context.get_data()
     all_lessons = [LessonResult(**l) for l in data.get("search_results", [])]
     query = data.get("search_query", "")
-    stage = data.get("clarify_stage", "subject")
-    dominant = data.get("clarify_dominant", "")
+    clarify_data = data.get("clarify_result", {})
 
-    if choice == "dominant":
-        field = "subject" if stage == "subject" else "topic"
-        filtered = [l for l in all_lessons if getattr(l, field) == dominant]
-    else:
+    if choice == "all":
         filtered = all_lessons
+    else:
+        idx = int(choice)
+        options = clarify_data.get("options", [])
+        selected_value = options[idx]["value"]
 
-    # Check for second-level clarification (topic)
-    if choice == "dominant" and stage == "subject":
-        clarification = search_service.check_clarification(
-            filtered, stage="topic", selected_subject=dominant,
+        field = level  # "subject", "grade", or "topic"
+        filtered = [
+            l for l in all_lessons
+            if str(getattr(l, field) or "") == selected_value
+        ]
+
+    # Re-check for next-level clarification on filtered results
+    next_clarification = search_service.check_clarification(filtered)
+    if next_clarification:
+        await context.update_data(
+            search_results=[l.model_dump() for l in filtered],
+            clarify_result=next_clarification.model_dump(),
         )
-        if clarification:
-            await context.update_data(
-                search_results=[l.model_dump() for l in filtered],
-                clarify_stage="topic",
-                clarify_dominant=clarification.dominant_value,
-                clarify_subject=dominant,
-            )
-            kb = clarify_keyboard(clarification.dominant_value)
-            await event.bot.edit_message(
-                message_id=event.message.body.mid,
-                text=clarification.message,
-                attachments=[kb.as_markup()],
-            )
-            return
+        options = [o.model_dump() for o in next_clarification.options]
+        kb = clarify_keyboard(options, next_clarification.level)
+        await event.bot.edit_message(
+            message_id=event.message.body.mid,
+            text=next_clarification.message,
+            attachments=[kb.as_markup()],
+        )
+        return
 
     # Show results with pagination
     total = len(filtered)
@@ -124,7 +128,7 @@ async def handle_clarification(event: MessageCallback, context: MemoryContext, s
 
     await context.update_data(
         search_filtered=[l.model_dump() for l in filtered],
-        clarify_stage=None,
+        clarify_result=None,
     )
 
     if search_result.total_pages > 0:
