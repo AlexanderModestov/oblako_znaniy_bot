@@ -9,7 +9,7 @@ from aiogram.types import (
 )
 
 from src.config import get_settings
-from src.core.schemas import LessonResult, SearchResult
+from src.core.schemas import ClarifyResult, LessonResult, SearchResult
 from src.core.services.search import SearchService
 from src.core.services.user import UserService
 from src.telegram.formatters import format_text_results
@@ -62,15 +62,15 @@ async def handle_search(message: Message, state: FSMContext, session):
     # Check if clarification might be needed
     if result.total > search_service.clarify_threshold:
         all_lessons = await search_service.fts_search_all(session, query)
-        clarification = search_service.check_clarification(all_lessons, stage="subject")
+        clarification = search_service.check_clarification(all_lessons)
         if clarification:
             await state.update_data(
                 search_results=[l.model_dump() for l in all_lessons],
                 search_total=result.total,
-                clarify_stage="subject",
-                clarify_dominant=clarification.dominant_value,
+                clarify_result=clarification.model_dump(),
             )
-            keyboard = clarify_keyboard(clarification.dominant_value)
+            options = [o.model_dump() for o in clarification.options]
+            keyboard = clarify_keyboard(options, clarification.level)
             await message.answer(clarification.message, reply_markup=keyboard)
             return
 
@@ -83,36 +83,40 @@ async def handle_search(message: Message, state: FSMContext, session):
 
 @router.callback_query(F.data.startswith("clarify:"))
 async def handle_clarification(callback: CallbackQuery, state: FSMContext, session):
-    choice = callback.data.split(":")[1]  # "dominant" or "all"
-    data = await state.get_data()
+    parts = callback.data.split(":")  # clarify:{level}:{index_or_all}
+    level = parts[1]
+    choice = parts[2]
 
+    data = await state.get_data()
     all_lessons = [LessonResult(**l) for l in data.get("search_results", [])]
     query = data.get("search_query", "")
-    stage = data.get("clarify_stage", "subject")
-    dominant = data.get("clarify_dominant", "")
+    clarify_data = data.get("clarify_result", {})
 
-    if choice == "dominant":
-        field = "subject" if stage == "subject" else "topic"
-        filtered = [l for l in all_lessons if getattr(l, field) == dominant]
-    else:
+    if choice == "all":
         filtered = all_lessons
+    else:
+        idx = int(choice)
+        options = clarify_data.get("options", [])
+        selected_value = options[idx]["value"]
 
-    # Check for second-level clarification (topic) if we just filtered by subject
-    if choice == "dominant" and stage == "subject":
-        clarification = search_service.check_clarification(
-            filtered, stage="topic", selected_subject=dominant,
+        field = level  # "subject", "grade", or "topic"
+        filtered = [
+            l for l in all_lessons
+            if str(getattr(l, field) or "") == selected_value
+        ]
+
+    # Re-check for next-level clarification on filtered results
+    next_clarification = search_service.check_clarification(filtered)
+    if next_clarification:
+        await state.update_data(
+            search_results=[l.model_dump() for l in filtered],
+            clarify_result=next_clarification.model_dump(),
         )
-        if clarification:
-            await state.update_data(
-                search_results=[l.model_dump() for l in filtered],
-                clarify_stage="topic",
-                clarify_dominant=clarification.dominant_value,
-                clarify_subject=dominant,
-            )
-            keyboard = clarify_keyboard(clarification.dominant_value)
-            await callback.message.edit_text(clarification.message, reply_markup=keyboard)
-            await callback.answer()
-            return
+        options = [o.model_dump() for o in next_clarification.options]
+        keyboard = clarify_keyboard(options, next_clarification.level)
+        await callback.message.edit_text(next_clarification.message, reply_markup=keyboard)
+        await callback.answer()
+        return
 
     # Show results with pagination
     total = len(filtered)
@@ -125,10 +129,9 @@ async def handle_clarification(callback: CallbackQuery, state: FSMContext, sessi
     )
     text = format_text_results(search_result)
 
-    # Save filtered results for pagination
     await state.update_data(
         search_filtered=[l.model_dump() for l in filtered],
-        clarify_stage=None,
+        clarify_result=None,
     )
 
     keyboard = None
