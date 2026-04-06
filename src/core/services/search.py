@@ -125,36 +125,52 @@ class SearchService:
     def check_clarification(
         self,
         lessons: list[LessonResult],
-        stage: str = "subject",
-        selected_subject: str | None = None,
-    ) -> ClarifyQuestion | None:
+    ) -> ClarifyResult | None:
+        """Analyze results and return adaptive clarification if needed.
+
+        Priority: subjects → grades → topics.
+        Returns None if below threshold or results are homogeneous.
+        """
         if len(lessons) <= self.clarify_threshold:
             return None
 
-        field = "subject" if stage == "subject" else "topic"
-        counts: dict[str, int] = {}
-        for lesson in lessons:
-            value = getattr(lesson, field) or ""
-            if value:
-                counts[value] = counts.get(value, 0) + 1
+        for level, field, fmt in [
+            ("subject", "subject", lambda v, c: f"{v} ({c})"),
+            ("grade", "grade", lambda v, c: f"{v} класс ({c})"),
+            ("topic", "topic", lambda v, c: f"{v} ({c})"),
+        ]:
+            counts: dict[str, int] = {}
+            for lesson in lessons:
+                value = getattr(lesson, field)
+                if value is None:
+                    continue
+                key = str(value)
+                counts[key] = counts.get(key, 0) + 1
 
-        if len(counts) <= 1:
-            return None
+            if len(counts) <= 1:
+                continue
 
-        dominant = max(counts, key=counts.get)
-        total = len(lessons)
+            sorted_items = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:7]
+            options = [
+                ClarifyOption(value=val, display=fmt(val, cnt), count=cnt)
+                for val, cnt in sorted_items
+            ]
 
-        if stage == "subject":
-            message = f"Найдено {total} результатов. Показать уроки по {dominant}? Или все найденные?"
-        else:
-            message = f"Найдено {total} результатов по {selected_subject}. Показать уроки по теме {dominant}? Или все по {selected_subject}?"
+            total = len(lessons)
+            if level == "subject":
+                message = f"Найдено {total} результатов. Выберите предмет:"
+            elif level == "grade":
+                subj = lessons[0].subject or ""
+                message = f"Найдено {total} результатов по {subj}. Выберите класс:"
+            else:
+                subj = lessons[0].subject or ""
+                grade = lessons[0].grade
+                grade_str = f", {grade} класс" if grade else ""
+                message = f"Найдено {total} результатов — {subj}{grade_str}. Выберите тему:"
 
-        return ClarifyQuestion(
-            stage=stage,
-            dominant_value=dominant,
-            total=total,
-            message=message,
-        )
+            return ClarifyResult(level=level, options=options, message=message, total=total)
+
+        return None
 
     async def fts_search_all(self, session: AsyncSession, query: str) -> list[LessonResult]:
         """Fetch all FTS results without pagination (for clarification analysis)."""
