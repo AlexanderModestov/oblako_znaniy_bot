@@ -18,7 +18,8 @@ def format_lesson_param(lesson: LessonResult) -> str:
 
 def format_lesson_text(lesson: LessonResult, index: int) -> str:
     semantic_mark = "\U0001f916 " if lesson.is_semantic else ""
-    parts = [p for p in [lesson.subject, lesson.section, lesson.topic] if p]
+    grade_str = f"{lesson.grade} класс" if lesson.grade else None
+    parts = [p for p in [lesson.subject, grade_str, lesson.section, lesson.topic] if p]
     context = " | ".join(parts)
     return (
         f"{index}. {semantic_mark}{context}\n"
