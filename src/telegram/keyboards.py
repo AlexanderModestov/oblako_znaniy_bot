@@ -121,11 +121,21 @@ def search_pagination_keyboard(page: int, total_pages: int) -> InlineKeyboardMar
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def clarify_keyboard(dominant_value: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=dominant_value, callback_data="clarify:dominant")],
-        [InlineKeyboardButton(text="Все найденные", callback_data="clarify:all")],
+def clarify_keyboard(options: list[dict], level: str) -> InlineKeyboardMarkup:
+    """Build clarification keyboard from options.
+
+    Each option: {"value": str, "display": str, "count": int}
+    Callback: clarify:{level}:{index}
+    """
+    buttons = []
+    for i, opt in enumerate(options):
+        buttons.append([
+            InlineKeyboardButton(text=opt["display"], callback_data=f"clarify:{level}:{i}")
+        ])
+    buttons.append([
+        InlineKeyboardButton(text="Показать все", callback_data=f"clarify:{level}:all")
     ])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def search_choice_keyboard() -> InlineKeyboardMarkup:
