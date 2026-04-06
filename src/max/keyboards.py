@@ -105,10 +105,16 @@ def search_pagination_keyboard(page: int, total_pages: int) -> InlineKeyboardBui
     return kb
 
 
-def clarify_keyboard(dominant_value: str) -> InlineKeyboardBuilder:
+def clarify_keyboard(options: list[dict], level: str) -> InlineKeyboardBuilder:
+    """Build clarification keyboard from options.
+
+    Each option: {"value": str, "display": str, "count": int}
+    Callback: clarify:{level}:{index}
+    """
     kb = InlineKeyboardBuilder()
-    kb.row(CallbackButton(text=dominant_value, payload="clarify:dominant"))
-    kb.row(CallbackButton(text="Все найденные", payload="clarify:all"))
+    for i, opt in enumerate(options):
+        kb.row(CallbackButton(text=opt["display"], payload=f"clarify:{level}:{i}"))
+    kb.row(CallbackButton(text="Показать все", payload=f"clarify:{level}:all"))
     return kb
 
 
