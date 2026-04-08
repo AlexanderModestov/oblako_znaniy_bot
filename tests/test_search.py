@@ -231,3 +231,11 @@ async def test_search_by_level_3_adds_or_results(mock_settings):
     assert result.total == 2
     assert mock_all.call_count == 2
     assert mock_all.call_args_list[1].kwargs.get("use_or", False) is True
+
+
+@pytest.mark.asyncio
+@patch("src.core.services.search.get_settings", side_effect=_make_mock_settings)
+async def test_search_by_level_invalid_raises(mock_settings):
+    service = SearchService()
+    with pytest.raises(ValueError, match="Invalid search level"):
+        await service.search_by_level(MagicMock(), "история", level=0)

@@ -127,6 +127,8 @@ class SearchService:
 
     async def search_by_level(self, session: AsyncSession, query: str, level: int, page: int = 1) -> SearchResult:
         """Search at the given level (1=AND, 2=AND+semantic, 3=AND+semantic+OR), paginated."""
+        if level not in (1, 2, 3):
+            raise ValueError(f"Invalid search level: {level!r}. Must be 1, 2, or 3.")
         if level == 1:
             lessons, total = await self.fts_search(session, query, page=page)
             return SearchResult(query=query, lessons=lessons, total=total, page=page, per_page=self.per_page)
