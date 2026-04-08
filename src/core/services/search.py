@@ -13,7 +13,12 @@ logger = logging.getLogger(__name__)
 
 
 def _build_tsquery(query: str):
-    """Build a tsquery expression: single word uses plainto_tsquery, multiple words use OR logic."""
+    """AND logic: all words must be present. Uses plainto_tsquery for all cases."""
+    return func.plainto_tsquery("russian", query)
+
+
+def _build_tsquery_or(query: str):
+    """OR logic: any word matches. Used as fallback when AND yields too few results."""
     words = query.strip().split()
     if len(words) <= 1:
         return func.plainto_tsquery("russian", query)

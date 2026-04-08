@@ -1,4 +1,5 @@
-from unittest.mock import patch, MagicMock
+import pytest
+from unittest.mock import patch, MagicMock, AsyncMock
 
 from src.core.schemas import LessonResult, ClarifyOption, ClarifyResult
 from src.core.services.search import SearchService, _build_tsquery
@@ -36,11 +37,28 @@ def test_build_tsquery_single_word():
     assert "websearch_to_tsquery" not in sql
 
 
-def test_build_tsquery_multiple_words():
+def test_build_tsquery_multiple_words_uses_and():
+    # AND logic: plainto_tsquery handles multi-word with AND
     expr = _build_tsquery("тангенс котангенс")
     sql = str(expr.compile())
+    assert "plainto_tsquery" in sql
+
+
+def test_build_tsquery_or_multiple_words():
+    from src.core.services.search import _build_tsquery_or
+    expr = _build_tsquery_or("тангенс котангенс")
+    compiled = expr.compile()
+    sql = str(compiled)
     assert "websearch_to_tsquery" in sql
-    assert "plainto_tsquery" not in sql
+    # OR is passed as part of the query argument (bind param), not inline SQL
+    assert any("OR" in str(v) for v in compiled.params.values())
+
+
+def test_build_tsquery_or_single_word():
+    from src.core.services.search import _build_tsquery_or
+    expr = _build_tsquery_or("тангенс")
+    sql = str(expr.compile())
+    assert "plainto_tsquery" in sql
 
 
 def _make_lesson(subject="Математика", grade=5, topic="Функции", section="Раздел 1"):
