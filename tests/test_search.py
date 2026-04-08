@@ -154,3 +154,58 @@ def test_clarify_max_7_options(mock_settings):
         lessons.extend([_make_lesson(subject=subj) for _ in range(10 - i)])
     result = service.check_clarification(lessons)
     assert len(result.options) <= 7
+
+
+@pytest.mark.asyncio
+@patch("src.core.services.search.get_settings", side_effect=_make_mock_settings)
+async def test_hybrid_search_uses_or_fallback_when_and_insufficient(mock_settings):
+    """When AND FTS returns fewer than fts_min_results, OR FTS is used and returns enough results."""
+    service = SearchService()
+
+    or_lessons = [
+        LessonResult(
+            title=f"Вариант {i}", url=f"https://example.com/{i}",
+            subject="Математика", grade=5, section="Раздел 1", topic="Тема 1",
+        )
+        for i in range(3)
+    ]
+
+    with patch.object(service, "fts_search", new_callable=AsyncMock) as mock_fts, \
+         patch.object(service, "semantic_search", new_callable=AsyncMock) as mock_sem:
+
+        mock_fts.side_effect = [
+            ([], 0),                    # AND call → insufficient
+            (or_lessons, 3),            # OR call → returns enough results
+        ]
+        mock_sem.return_value = []
+
+        result = await service.hybrid_search(MagicMock(), "Петр 1")
+
+    assert mock_fts.call_count == 2
+    assert result.total == 3
+
+
+@pytest.mark.asyncio
+@patch("src.core.services.search.get_settings", side_effect=_make_mock_settings)
+async def test_hybrid_search_uses_and_when_sufficient(mock_settings):
+    """When AND FTS returns >= fts_min_results, OR is never called."""
+    service = SearchService()
+
+    lessons = [
+        LessonResult(
+            title=f"Урок {i}", url=f"https://example.com/{i}",
+            subject="История", grade=8, section="Раздел", topic="Тема",
+        )
+        for i in range(5)
+    ]
+
+    with patch.object(service, "fts_search", new_callable=AsyncMock) as mock_fts, \
+         patch.object(service, "semantic_search", new_callable=AsyncMock) as mock_sem:
+
+        mock_fts.return_value = (lessons, 5)
+        mock_sem.return_value = []
+
+        result = await service.hybrid_search(MagicMock(), "история петр")
+
+    assert mock_fts.call_count == 1
+    assert result.total == 5

@@ -33,8 +33,8 @@ class SearchService:
         self.per_page = settings.results_per_page
         self.clarify_threshold = settings.search_clarify_threshold
 
-    async def fts_search(self, session: AsyncSession, query: str, page: int = 1) -> tuple[list[LessonResult], int]:
-        ts_query = _build_tsquery(query)
+    async def fts_search(self, session: AsyncSession, query: str, page: int = 1, use_or: bool = False) -> tuple[list[LessonResult], int]:
+        ts_query = _build_tsquery_or(query) if use_or else _build_tsquery(query)
 
         count_q = select(func.count(Lesson.id)).where(Lesson.search_vector.op("@@")(ts_query))
         count_result = await session.execute(count_q)
@@ -105,6 +105,7 @@ class SearchService:
         return lessons
 
     async def hybrid_search(self, session: AsyncSession, query: str, page: int = 1) -> SearchResult:
+        # Step 1: try AND FTS (precise)
         fts_lessons, fts_total = await self.fts_search(session, query, page=1)
 
         if fts_total >= self.fts_min_results:
@@ -112,20 +113,27 @@ class SearchService:
                 fts_lessons, _ = await self.fts_search(session, query, page=page)
             return SearchResult(query=query, lessons=fts_lessons, total=fts_total, page=page, per_page=self.per_page)
 
-        # Not enough FTS results — add semantic search
-        # Reuse fts_lessons from the first call (already page 1)
-        fts_id_query = select(Lesson.id).where(
-            Lesson.search_vector.op("@@")(_build_tsquery(query))
+        # Step 2: AND insufficient — try OR FTS
+        or_lessons, or_total = await self.fts_search(session, query, page=1, use_or=True)
+
+        if or_total >= self.fts_min_results:
+            if page > 1:
+                or_lessons, _ = await self.fts_search(session, query, page=page, use_or=True)
+            return SearchResult(query=query, lessons=or_lessons, total=or_total, page=page, per_page=self.per_page)
+
+        # Step 3: OR also insufficient — add semantic
+        or_id_query = select(Lesson.id).where(
+            Lesson.search_vector.op("@@")(_build_tsquery_or(query))
         )
-        fts_id_result = await session.execute(fts_id_query)
-        exclude_ids = [row[0] for row in fts_id_result.all()]
+        or_id_result = await session.execute(or_id_query)
+        exclude_ids = [row[0] for row in or_id_result.all()]
 
         semantic_lessons = await self.semantic_search(session, query, exclude_ids=exclude_ids)
-        combined = fts_lessons + semantic_lessons
+        combined = or_lessons + semantic_lessons
         total = len(combined)
 
         offset = (page - 1) * self.per_page
-        page_lessons = combined[offset : offset + self.per_page]
+        page_lessons = combined[offset: offset + self.per_page]
 
         return SearchResult(query=query, lessons=page_lessons, total=total, page=page, per_page=self.per_page)
 
