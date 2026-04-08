@@ -1,7 +1,11 @@
+import logging
+
 from maxapi import F, Router
 from maxapi.context import MemoryContext
 from maxapi.types import MessageCallback, MessageCreated
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from src.config import get_settings
 from src.core.schemas import LessonResult, SearchResult
@@ -56,10 +60,13 @@ async def handle_expand(event: MessageCallback, context: MemoryContext, session:
     """Expand search to the next level."""
     data = await context.get_data()
     query = data.get("search_query", "")
-    if not query:
-        return
     current_level = data.get("search_level", 1)
+    logger.info("handle_expand: query=%r, current_level=%r, state_keys=%r", query, current_level, list(data.keys()))
+    if not query:
+        logger.warning("handle_expand: empty query, returning")
+        return
     new_level = min(current_level + 1, 3)
+    logger.info("handle_expand: expanding %d -> %d", current_level, new_level)
     await _run_search(event=event, context=context, session=session, query=query, level=new_level, edit=True)
 
 
@@ -107,13 +114,18 @@ async def _run_search(*, event, context: MemoryContext, session, query: str, lev
     else:
         kb = None
 
+    logger.info("_run_search: level=%d, total=%d, text_len=%d, edit=%s", level, total, len(text), edit)
     if kb:
         if edit:
-            await event.bot.edit_message(
-                message_id=event.message.body.mid,
-                text=text,
-                attachments=[kb.as_markup()],
-            )
+            try:
+                await event.bot.edit_message(
+                    message_id=event.message.body.mid,
+                    text=text,
+                    attachments=[kb.as_markup()],
+                )
+                logger.info("_run_search: edit_message succeeded")
+            except Exception:
+                logger.exception("_run_search: edit_message failed")
         else:
             await event.message.answer(text, attachments=[kb.as_markup()])
     else:
