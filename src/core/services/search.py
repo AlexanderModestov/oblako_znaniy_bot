@@ -104,38 +104,49 @@ class SearchService:
                 )
         return lessons
 
-    async def hybrid_search(self, session: AsyncSession, query: str, page: int = 1) -> SearchResult:
-        # Step 1: try AND FTS (precise)
-        fts_lessons, fts_total = await self.fts_search(session, query, page=1)
+    async def _build_level_results(self, session: AsyncSession, query: str, level: int) -> list[LessonResult]:
+        """Build accumulated lesson list for level 2 or 3 (no pagination)."""
+        and_lessons = await self.fts_search_all(session, query)
 
-        if fts_total >= self.fts_min_results:
-            if page > 1:
-                fts_lessons, _ = await self.fts_search(session, query, page=page)
-            return SearchResult(query=query, lessons=fts_lessons, total=fts_total, page=page, per_page=self.per_page)
-
-        # Step 2: AND insufficient — try OR FTS
-        or_lessons, or_total = await self.fts_search(session, query, page=1, use_or=True)
-
-        if or_total >= self.fts_min_results:
-            if page > 1:
-                or_lessons, _ = await self.fts_search(session, query, page=page, use_or=True)
-            return SearchResult(query=query, lessons=or_lessons, total=or_total, page=page, per_page=self.per_page)
-
-        # Step 3: OR also insufficient — add semantic
-        or_id_query = select(Lesson.id).where(
-            Lesson.search_vector.op("@@")(_build_tsquery_or(query))
+        and_id_query = select(Lesson.id).where(
+            Lesson.search_vector.op("@@")(_build_tsquery(query))
         )
-        or_id_result = await session.execute(or_id_query)
-        exclude_ids = [row[0] for row in or_id_result.all()]
+        and_id_result = await session.execute(and_id_query)
+        and_ids = [row[0] for row in and_id_result.all()]
 
-        semantic_lessons = await self.semantic_search(session, query, exclude_ids=exclude_ids)
-        combined = or_lessons + semantic_lessons
+        semantic_lessons = await self.semantic_search(session, query, exclude_ids=and_ids)
+        seen_urls = {l.url for l in and_lessons}
+        combined = and_lessons + [l for l in semantic_lessons if l.url not in seen_urls]
+
+        if level >= 3:
+            seen_urls = {l.url for l in combined}
+            or_lessons = await self.fts_search_all(session, query, use_or=True)
+            combined += [l for l in or_lessons if l.url not in seen_urls]
+
+        return combined
+
+    async def search_by_level(self, session: AsyncSession, query: str, level: int, page: int = 1) -> SearchResult:
+        """Search at the given level (1=AND, 2=AND+semantic, 3=AND+semantic+OR), paginated."""
+        if level == 1:
+            lessons, total = await self.fts_search(session, query, page=page)
+            return SearchResult(query=query, lessons=lessons, total=total, page=page, per_page=self.per_page)
+
+        combined = await self._build_level_results(session, query, level)
         total = len(combined)
-
         offset = (page - 1) * self.per_page
-        page_lessons = combined[offset: offset + self.per_page]
+        return SearchResult(
+            query=query,
+            lessons=combined[offset: offset + self.per_page],
+            total=total,
+            page=page,
+            per_page=self.per_page,
+        )
 
-        return SearchResult(query=query, lessons=page_lessons, total=total, page=page, per_page=self.per_page)
+    async def get_all_lessons_for_level(self, session: AsyncSession, query: str, level: int) -> list[LessonResult]:
+        """Get all lessons for a level without pagination — for clarification analysis."""
+        if level == 1:
+            return await self.fts_search_all(session, query)
+        return await self._build_level_results(session, query, level)
 
     def check_clarification(
         self,
@@ -187,9 +198,9 @@ class SearchService:
 
         return None
 
-    async def fts_search_all(self, session: AsyncSession, query: str) -> list[LessonResult]:
+    async def fts_search_all(self, session: AsyncSession, query: str, use_or: bool = False) -> list[LessonResult]:
         """Fetch all FTS results without pagination (for clarification analysis)."""
-        ts_query = _build_tsquery(query)
+        ts_query = _build_tsquery_or(query) if use_or else _build_tsquery(query)
         na_last = case((Lesson.url == "N/A", 1), else_=0)
         q = (
             select(Lesson)

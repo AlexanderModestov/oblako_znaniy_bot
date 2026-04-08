@@ -20,7 +20,7 @@ def test_search_service_has_required_methods(mock_settings):
     service = SearchService()
     assert hasattr(service, "fts_search")
     assert hasattr(service, "semantic_search")
-    assert hasattr(service, "hybrid_search")
+    assert hasattr(service, "search_by_level")
 
 
 @patch("src.core.services.search.get_settings", side_effect=_make_mock_settings)
@@ -156,94 +156,78 @@ def test_clarify_max_7_options(mock_settings):
     assert len(result.options) <= 7
 
 
+# --- search_by_level tests ---
+
 @pytest.mark.asyncio
 @patch("src.core.services.search.get_settings", side_effect=_make_mock_settings)
-async def test_hybrid_search_uses_or_fallback_when_and_insufficient(mock_settings):
-    """When AND FTS returns fewer than fts_min_results, OR FTS is used and returns enough results."""
+async def test_search_by_level_1_returns_and_fts(mock_settings):
+    """Level 1 returns AND FTS results directly."""
     service = SearchService()
-
-    or_lessons = [
-        LessonResult(
-            title=f"Вариант {i}", url=f"https://example.com/{i}",
-            subject="Математика", grade=5, section="Раздел 1", topic="Тема 1",
-        )
-        for i in range(3)
-    ]
-
-    with patch.object(service, "fts_search", new_callable=AsyncMock) as mock_fts, \
-         patch.object(service, "semantic_search", new_callable=AsyncMock) as mock_sem:
-
-        mock_fts.side_effect = [
-            ([], 0),                    # AND call → insufficient
-            (or_lessons, 3),            # OR call → returns enough results
-        ]
-        mock_sem.return_value = []
-
-        result = await service.hybrid_search(MagicMock(), "Петр 1")
-
-    assert mock_fts.call_count == 2
+    lessons = [_make_lesson() for _ in range(3)]
+    with patch.object(service, "fts_search", new_callable=AsyncMock) as mock_fts:
+        mock_fts.return_value = (lessons, 3)
+        result = await service.search_by_level(MagicMock(), "история", level=1)
     assert result.total == 3
-
-    first_call, second_call = mock_fts.call_args_list
-    assert first_call.kwargs.get("use_or", False) is False   # AND path
-    assert second_call.kwargs.get("use_or", False) is True    # OR path
+    assert mock_fts.call_count == 1
 
 
 @pytest.mark.asyncio
 @patch("src.core.services.search.get_settings", side_effect=_make_mock_settings)
-async def test_hybrid_search_uses_semantic_when_or_also_insufficient(mock_settings):
-    """When both AND and OR FTS return fewer than fts_min_results, semantic search is used."""
+async def test_search_by_level_2_combines_and_semantic(mock_settings):
+    """Level 2 returns AND + semantic, deduplicated by URL."""
     service = SearchService()
-
-    semantic_lesson = LessonResult(
-        title="Семантический урок", url="https://example.com/sem",
+    and_lesson = _make_lesson(subject="История")
+    sem_lesson = LessonResult(
+        title="Семантика", url="https://example.com/sem",
         subject="История", grade=8, section="Раздел", topic="Тема",
     )
-
-    with patch.object(service, "fts_search", new_callable=AsyncMock) as mock_fts, \
+    mock_session = MagicMock()
+    mock_session.execute = AsyncMock(return_value=MagicMock(all=MagicMock(return_value=[])))
+    with patch.object(service, "fts_search_all", new_callable=AsyncMock) as mock_all, \
          patch.object(service, "semantic_search", new_callable=AsyncMock) as mock_sem:
-
-        mock_fts.side_effect = [
-            ([], 0),  # AND call → insufficient
-            ([], 0),  # OR call → insufficient
-        ]
-        mock_sem.return_value = [semantic_lesson]
-
-        # Need to also mock session.execute for the exclude_ids query
-        mock_session = MagicMock()
-        mock_execute_result = MagicMock()
-        mock_execute_result.all.return_value = []
-        mock_session.execute = AsyncMock(return_value=mock_execute_result)
-
-        result = await service.hybrid_search(mock_session, "редкий запрос")
-
-    assert mock_fts.call_count == 2
-    assert mock_sem.call_count == 1
-    assert result.total == 1
-    assert result.lessons[0].title == "Семантический урок"
+        mock_all.return_value = [and_lesson]
+        mock_sem.return_value = [sem_lesson]
+        result = await service.search_by_level(mock_session, "история", level=2)
+    assert result.total == 2
 
 
 @pytest.mark.asyncio
 @patch("src.core.services.search.get_settings", side_effect=_make_mock_settings)
-async def test_hybrid_search_uses_and_when_sufficient(mock_settings):
-    """When AND FTS returns >= fts_min_results, OR is never called."""
+async def test_search_by_level_2_deduplicates_by_url(mock_settings):
+    """Level 2 deduplicates lessons with same URL."""
     service = SearchService()
-
-    lessons = [
-        LessonResult(
-            title=f"Урок {i}", url=f"https://example.com/{i}",
-            subject="История", grade=8, section="Раздел", topic="Тема",
-        )
-        for i in range(5)
-    ]
-
-    with patch.object(service, "fts_search", new_callable=AsyncMock) as mock_fts, \
+    and_lesson = _make_lesson(subject="История")
+    duplicate = LessonResult(
+        title="Дубль", url=and_lesson.url,
+        subject="История", grade=8, section="Раздел", topic="Тема",
+    )
+    mock_session = MagicMock()
+    mock_session.execute = AsyncMock(return_value=MagicMock(all=MagicMock(return_value=[])))
+    with patch.object(service, "fts_search_all", new_callable=AsyncMock) as mock_all, \
          patch.object(service, "semantic_search", new_callable=AsyncMock) as mock_sem:
+        mock_all.return_value = [and_lesson]
+        mock_sem.return_value = [duplicate]
+        result = await service.search_by_level(mock_session, "история", level=2)
+    assert result.total == 1
 
-        mock_fts.return_value = (lessons, 5)
+
+@pytest.mark.asyncio
+@patch("src.core.services.search.get_settings", side_effect=_make_mock_settings)
+async def test_search_by_level_3_adds_or_results(mock_settings):
+    """Level 3 adds OR FTS results not already in AND+semantic."""
+    service = SearchService()
+    and_lesson = _make_lesson(subject="История")
+    or_lesson = LessonResult(
+        title="OR урок", url="https://example.com/or",
+        subject="Математика", grade=5, section="Раздел", topic="Тема",
+    )
+    mock_session = MagicMock()
+    mock_session.execute = AsyncMock(return_value=MagicMock(all=MagicMock(return_value=[])))
+    with patch.object(service, "fts_search_all", new_callable=AsyncMock) as mock_all, \
+         patch.object(service, "semantic_search", new_callable=AsyncMock) as mock_sem:
+        mock_all.side_effect = [[and_lesson], [or_lesson]]
         mock_sem.return_value = []
-
-        result = await service.hybrid_search(MagicMock(), "история петр")
-
-    assert mock_fts.call_count == 1
-    assert result.total == 5
+        result = await service.search_by_level(mock_session, "история", level=3)
+    assert result.total == 2
+    assert mock_all.call_count == 2
+    assert mock_all.call_args_list[1].kwargs.get("use_or", False) is True
