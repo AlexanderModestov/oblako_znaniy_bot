@@ -184,6 +184,44 @@ async def test_hybrid_search_uses_or_fallback_when_and_insufficient(mock_setting
     assert mock_fts.call_count == 2
     assert result.total == 3
 
+    first_call, second_call = mock_fts.call_args_list
+    assert first_call.kwargs.get("use_or", False) is False   # AND path
+    assert second_call.kwargs.get("use_or", False) is True    # OR path
+
+
+@pytest.mark.asyncio
+@patch("src.core.services.search.get_settings", side_effect=_make_mock_settings)
+async def test_hybrid_search_uses_semantic_when_or_also_insufficient(mock_settings):
+    """When both AND and OR FTS return fewer than fts_min_results, semantic search is used."""
+    service = SearchService()
+
+    semantic_lesson = LessonResult(
+        title="Семантический урок", url="https://example.com/sem",
+        subject="История", grade=8, section="Раздел", topic="Тема",
+    )
+
+    with patch.object(service, "fts_search", new_callable=AsyncMock) as mock_fts, \
+         patch.object(service, "semantic_search", new_callable=AsyncMock) as mock_sem:
+
+        mock_fts.side_effect = [
+            ([], 0),  # AND call → insufficient
+            ([], 0),  # OR call → insufficient
+        ]
+        mock_sem.return_value = [semantic_lesson]
+
+        # Need to also mock session.execute for the exclude_ids query
+        mock_session = MagicMock()
+        mock_execute_result = MagicMock()
+        mock_execute_result.all.return_value = []
+        mock_session.execute = AsyncMock(return_value=mock_execute_result)
+
+        result = await service.hybrid_search(mock_session, "редкий запрос")
+
+    assert mock_fts.call_count == 2
+    assert mock_sem.call_count == 1
+    assert result.total == 1
+    assert result.lessons[0].title == "Семантический урок"
+
 
 @pytest.mark.asyncio
 @patch("src.core.services.search.get_settings", side_effect=_make_mock_settings)
