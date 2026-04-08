@@ -103,6 +103,10 @@ async def _run_search(*, state: FSMContext, session, query: str, level: int, edi
     total = len(all_lessons)
     result = SearchResult(query=query, lessons=page_lessons, total=total, page=1, per_page=per_page)
     text = format_text_results(result)
+    if level == 2:
+        text += "\n\n\U0001f50e Расширенный поиск (семантика)"
+    elif level == 3:
+        text += "\n\n\U0001f50e Максимальный поиск"
     if result.total_pages > 0:
         keyboard = search_pagination_keyboard(1, result.total_pages, level)
     elif level < 3:
