@@ -63,10 +63,15 @@ async def handle_expand(callback: CallbackQuery, state: FSMContext, session):
     """Expand search to the next level."""
     data = await state.get_data()
     query = data.get("search_query", "")
+    if not query:
+        await callback.answer("Нет активного поиска.", show_alert=True)
+        return
     current_level = data.get("search_level", 1)
     new_level = min(current_level + 1, 3)
-    await _run_search(callback=callback, state=state, session=session, query=query, level=new_level, edit=True)
-    await callback.answer()
+    try:
+        await _run_search(callback=callback, state=state, session=session, query=query, level=new_level, edit=True)
+    finally:
+        await callback.answer()
 
 
 async def _run_search(*, state: FSMContext, session, query: str, level: int, edit: bool,
