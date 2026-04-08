@@ -38,10 +38,12 @@ def test_build_tsquery_single_word():
 
 
 def test_build_tsquery_multiple_words_uses_and():
-    # AND logic: plainto_tsquery handles multi-word with AND
     expr = _build_tsquery("тангенс котангенс")
-    sql = str(expr.compile())
+    compiled = expr.compile()
+    sql = str(compiled)
     assert "plainto_tsquery" in sql
+    # Verify multi-word string passed as single param (AND semantics — not split into OR)
+    assert any("тангенс котангенс" in str(v) for v in compiled.params.values())
 
 
 def test_build_tsquery_or_multiple_words():
@@ -50,8 +52,8 @@ def test_build_tsquery_or_multiple_words():
     compiled = expr.compile()
     sql = str(compiled)
     assert "websearch_to_tsquery" in sql
-    # OR is passed as part of the query argument (bind param), not inline SQL
-    assert any("OR" in str(v) for v in compiled.params.values())
+    # OR is embedded in the string param passed to websearch_to_tsquery
+    assert any("OR" in str(v).upper() for v in compiled.params.values())
 
 
 def test_build_tsquery_or_single_word():
