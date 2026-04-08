@@ -98,6 +98,12 @@ async def _run_search(*, event, context: MemoryContext, session, query: str, lev
 
     if result.total_pages > 0:
         kb = search_pagination_keyboard(1, result.total_pages, level)
+    elif level < 3:
+        kb = search_pagination_keyboard(1, 1, level)
+    else:
+        kb = None
+
+    if kb:
         if edit:
             await event.bot.edit_message(
                 message_id=event.message.body.mid,

@@ -103,7 +103,12 @@ async def _run_search(*, state: FSMContext, session, query: str, level: int, edi
     total = len(all_lessons)
     result = SearchResult(query=query, lessons=page_lessons, total=total, page=1, per_page=per_page)
     text = format_text_results(result)
-    keyboard = search_pagination_keyboard(1, result.total_pages, level) if result.total_pages > 0 else None
+    if result.total_pages > 0:
+        keyboard = search_pagination_keyboard(1, result.total_pages, level)
+    elif level < 3:
+        keyboard = search_pagination_keyboard(1, 1, level)
+    else:
+        keyboard = None
 
     if edit and callback:
         await callback.message.edit_text(text, reply_markup=keyboard)
