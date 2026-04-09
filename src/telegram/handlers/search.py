@@ -99,6 +99,7 @@ async def _run_search(*, state: FSMContext, session, query: str, level: int, edi
         search_all_lessons=[l.model_dump() for l in all_lessons],
         search_filtered=None,
         clarify_result=None,
+        clarify_history=[],
     )
 
     clarification = search_service.check_clarification(all_lessons)
@@ -136,14 +137,58 @@ async def _run_search(*, state: FSMContext, session, query: str, level: int, edi
 
 @router.callback_query(F.data == "clarify:back")
 async def handle_clarify_back(callback: CallbackQuery, state: FSMContext, session):
-    """Go back: re-run search at current level (re-triggers clarification from scratch)."""
+    """Go back: pop previous clarification step, or show raw results if at first step."""
     data = await state.get_data()
     query = data.get("search_query", "")
     search_level = data.get("search_level", 1)
+    history = data.get("clarify_history", [])
+
     if not query:
         await callback.answer()
         return
-    await _run_search(callback=callback, state=state, session=session, query=query, level=search_level, edit=True)
+
+    if history:
+        # Pop the last entry, restore previous clarification
+        previous = history[-1]
+        new_history = history[:-1]
+        prev_lessons_raw = previous.get("lessons", [])
+        prev_clarify = previous.get("clarify_result") or {}
+
+        await state.update_data(
+            search_all_lessons=prev_lessons_raw,
+            clarify_result=prev_clarify if prev_clarify else None,
+            clarify_history=new_history,
+            search_filtered=None,
+        )
+
+        options = prev_clarify.get("options", [])
+        prev_level = prev_clarify.get("level", "subject")
+        keyboard = clarify_keyboard(options, prev_level)
+        await _safe_edit(callback, prev_clarify.get("message", ""), keyboard)
+        await callback.answer()
+        return
+
+    # No history — show raw results at current level (bypass clarification)
+    all_lessons_raw = data.get("search_all_lessons", [])
+    all_lessons = [LessonResult(**l) for l in all_lessons_raw]
+    per_page = search_service.per_page
+    page_lessons = all_lessons[:per_page]
+    total = len(all_lessons)
+    result = SearchResult(query=query, lessons=page_lessons, total=total, page=1, per_page=per_page)
+    text = format_text_results(result)
+    if search_level == 2:
+        text += "\n\n\U0001f50e Расширенный поиск (семантика)"
+    elif search_level == 3:
+        text += "\n\n\U0001f50e Максимальный поиск"
+    if result.total_pages > 0:
+        keyboard = search_pagination_keyboard(1, result.total_pages, search_level)
+    elif search_level < 3:
+        keyboard = search_pagination_keyboard(1, 1, search_level)
+    else:
+        keyboard = None
+
+    await state.update_data(clarify_result=None, search_filtered=None)
+    await _safe_edit(callback, text, keyboard)
     await callback.answer()
 
 
@@ -158,6 +203,13 @@ async def handle_clarification(callback: CallbackQuery, state: FSMContext, sessi
     query = data.get("search_query", "")
     search_level = data.get("search_level", 1)
     clarify_data = data.get("clarify_result", {})
+    history = data.get("clarify_history", [])
+
+    # Push current state onto history stack before filtering
+    history = history + [{
+        "lessons": data.get("search_all_lessons", []),
+        "clarify_result": clarify_data,
+    }]
 
     if choice == "all":
         filtered = all_lessons
@@ -176,10 +228,11 @@ async def handle_clarification(callback: CallbackQuery, state: FSMContext, sessi
         await state.update_data(
             search_all_lessons=[l.model_dump() for l in filtered],
             clarify_result=next_clarification.model_dump(),
+            clarify_history=history,
         )
         options = [o.model_dump() for o in next_clarification.options]
         keyboard = clarify_keyboard(options, next_clarification.level)
-        await callback.message.edit_text(next_clarification.message, reply_markup=keyboard)
+        await _safe_edit(callback, next_clarification.message, keyboard)
         await callback.answer()
         return
 
@@ -192,10 +245,11 @@ async def handle_clarification(callback: CallbackQuery, state: FSMContext, sessi
     await state.update_data(
         search_filtered=[l.model_dump() for l in filtered],
         clarify_result=None,
+        clarify_history=history,
     )
 
     keyboard = search_pagination_keyboard(1, search_result.total_pages, search_level) if search_result.total_pages > 0 else None
-    await callback.message.edit_text(text, reply_markup=keyboard)
+    await _safe_edit(callback, text, keyboard)
     await callback.answer()
 
 
