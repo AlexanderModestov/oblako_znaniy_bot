@@ -46,23 +46,6 @@ def test_build_tsquery_multiple_words_uses_and():
     assert any("тангенс котангенс" in str(v) for v in compiled.params.values())
 
 
-def test_build_tsquery_or_multiple_words():
-    from src.core.services.search import _build_tsquery_or
-    expr = _build_tsquery_or("тангенс котангенс")
-    compiled = expr.compile()
-    sql = str(compiled)
-    assert "websearch_to_tsquery" in sql
-    # OR is embedded in the string param passed to websearch_to_tsquery
-    assert any("OR" in str(v).upper() for v in compiled.params.values())
-
-
-def test_build_tsquery_or_single_word():
-    from src.core.services.search import _build_tsquery_or
-    expr = _build_tsquery_or("тангенс")
-    sql = str(expr.compile())
-    assert "plainto_tsquery" in sql
-
-
 def _make_lesson(subject="Математика", grade=5, topic="Функции", section="Раздел 1"):
     return LessonResult(
         title="Урок", url="https://example.com",
@@ -213,24 +196,23 @@ async def test_search_by_level_2_deduplicates_by_url(mock_settings):
 
 @pytest.mark.asyncio
 @patch("src.core.services.search.get_settings", side_effect=_make_mock_settings)
-async def test_search_by_level_3_adds_or_results(mock_settings):
-    """Level 3 adds OR FTS results not already in AND+semantic."""
+async def test_search_by_level_2_does_not_call_or_fts(mock_settings):
+    """Level 2 must NOT invoke OR-FTS (that was level 3, now removed)."""
     service = SearchService()
     and_lesson = _make_lesson(subject="История")
-    or_lesson = LessonResult(
-        title="OR урок", url="https://example.com/or",
-        subject="Математика", grade=5, section="Раздел", topic="Тема",
-    )
     mock_session = MagicMock()
     mock_session.execute = AsyncMock(return_value=MagicMock(all=MagicMock(return_value=[])))
     with patch.object(service, "fts_search_all", new_callable=AsyncMock) as mock_all, \
          patch.object(service, "semantic_search", new_callable=AsyncMock) as mock_sem:
-        mock_all.side_effect = [[and_lesson], [or_lesson]]
+        mock_all.return_value = [and_lesson]
         mock_sem.return_value = []
-        result = await service.search_by_level(mock_session, "история", level=3)
-    assert result.total == 2
-    assert mock_all.call_count == 2
-    assert mock_all.call_args_list[1].kwargs.get("use_or", False) is True
+        result = await service.search_by_level(mock_session, "история", level=2)
+    assert result.total == 1
+    # Critical: fts_search_all should be called exactly ONCE (AND only, no OR pass).
+    assert mock_all.call_count == 1
+    # And never with use_or=True (parameter removed, but double-check via kwargs).
+    for call in mock_all.call_args_list:
+        assert "use_or" not in call.kwargs
 
 
 @pytest.mark.asyncio
@@ -239,3 +221,5 @@ async def test_search_by_level_invalid_raises(mock_settings):
     service = SearchService()
     with pytest.raises(ValueError, match="Invalid search level"):
         await service.search_by_level(MagicMock(), "история", level=0)
+    with pytest.raises(ValueError, match="Invalid search level"):
+        await service.search_by_level(MagicMock(), "история", level=3)

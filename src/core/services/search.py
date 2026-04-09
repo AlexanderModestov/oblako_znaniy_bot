@@ -20,14 +20,6 @@ def _build_tsquery(query: str):
     return func.plainto_tsquery("russian", query)
 
 
-def _build_tsquery_or(query: str):
-    """OR logic: any word matches. Used as fallback when AND yields too few results."""
-    words = query.strip().split()
-    if len(words) <= 1:
-        return func.plainto_tsquery("russian", query)
-    return func.websearch_to_tsquery("russian", " OR ".join(words))
-
-
 def _abbr_filters(query: str):
     """Return SQLAlchemy conditions requiring each abbreviation to appear literally."""
     conditions = []
@@ -51,8 +43,8 @@ class SearchService:
         self.per_page = settings.results_per_page
         self.clarify_threshold = settings.search_clarify_threshold
 
-    async def fts_search(self, session: AsyncSession, query: str, page: int = 1, use_or: bool = False) -> tuple[list[LessonResult], int]:
-        ts_query = _build_tsquery_or(query) if use_or else _build_tsquery(query)
+    async def fts_search(self, session: AsyncSession, query: str, page: int = 1) -> tuple[list[LessonResult], int]:
+        ts_query = _build_tsquery(query)
         abbr_conds = _abbr_filters(query)
 
         count_q = select(func.count(Lesson.id)).where(Lesson.search_vector.op("@@")(ts_query))
@@ -128,7 +120,7 @@ class SearchService:
         return lessons
 
     async def _build_level_results(self, session: AsyncSession, query: str, level: int) -> list[LessonResult]:
-        """Build accumulated lesson list for level 2 or 3 (no pagination)."""
+        """Build accumulated lesson list for level 2 (no pagination)."""
         and_lessons = await self.fts_search_all(session, query)
 
         and_id_query = select(Lesson.id).where(
@@ -141,17 +133,12 @@ class SearchService:
         seen_urls = {l.url for l in and_lessons}
         combined = and_lessons + [l for l in semantic_lessons if l.url not in seen_urls]
 
-        if level >= 3:
-            seen_urls = {l.url for l in combined}
-            or_lessons = await self.fts_search_all(session, query, use_or=True)
-            combined += [l for l in or_lessons if l.url not in seen_urls]
-
         return combined
 
     async def search_by_level(self, session: AsyncSession, query: str, level: int, page: int = 1) -> SearchResult:
-        """Search at the given level (1=AND, 2=AND+semantic, 3=AND+semantic+OR), paginated."""
-        if level not in (1, 2, 3):
-            raise ValueError(f"Invalid search level: {level!r}. Must be 1, 2, or 3.")
+        """Search at the given level (1=AND, 2=AND+semantic), paginated."""
+        if level not in (1, 2):
+            raise ValueError(f"Invalid search level: {level!r}. Must be 1 or 2.")
         if level == 1:
             lessons, total = await self.fts_search(session, query, page=page)
             return SearchResult(query=query, lessons=lessons, total=total, page=page, per_page=self.per_page)
@@ -223,9 +210,9 @@ class SearchService:
 
         return None
 
-    async def fts_search_all(self, session: AsyncSession, query: str, use_or: bool = False) -> list[LessonResult]:
+    async def fts_search_all(self, session: AsyncSession, query: str) -> list[LessonResult]:
         """Fetch all FTS results without pagination (for clarification analysis)."""
-        ts_query = _build_tsquery_or(query) if use_or else _build_tsquery(query)
+        ts_query = _build_tsquery(query)
         abbr_conds = _abbr_filters(query)
         na_last = case((Lesson.url == "N/A", 1), else_=0)
         q = (
