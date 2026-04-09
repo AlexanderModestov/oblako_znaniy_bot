@@ -98,7 +98,10 @@ async def on_bot_started(event: BotStarted, context: MemoryContext, session: Asy
         )
         await event.bot.send_message(
             chat_id=event.chat_id,
-            text="Добро пожаловать! Для начала работы пройдите регистрацию:",
+            text="Здравствуйте! Я бот-помощник по поиску и использованию материалов "
+            "«Облака знаний» в УБ ЦОК. Для того, чтобы получить доступ к базе "
+            "знаний, пройдите, пожалуйста, регистрацию. По вопросам работы с "
+            "ботом можно обращаться в нашу поддержку в Max: +7(931) 012-09-36",
             attachments=[kb.as_markup()],
         )
         return
@@ -125,7 +128,10 @@ async def cmd_start(event: MessageCreated, context: MemoryContext, session: Asyn
                 bot_contact_id=settings.max_bot_id or None,
             )
             await event.message.answer(
-                "Добро пожаловать! Для начала работы пройдите регистрацию:",
+                "Здравствуйте! Я бот-помощник по поиску и использованию материалов "
+                "«Облака знаний» в УБ ЦОК. Для того, чтобы получить доступ к базе "
+                "знаний, пройдите, пожалуйста, регистрацию. По вопросам работы с "
+                "ботом можно обращаться в нашу поддержку в Max: +7(931) 012-09-36",
                 attachments=[kb.as_markup()],
             )
         return
