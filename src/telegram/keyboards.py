@@ -108,13 +108,14 @@ def paginated_items_keyboard(
 
 def search_pagination_keyboard(page: int, total_pages: int, level: int = 1) -> InlineKeyboardMarkup:
     buttons = []
-    nav_row = []
-    if page > 1:
-        nav_row.append(InlineKeyboardButton(text="\u25c0 Назад", callback_data=f"search:page:{page - 1}"))
-    nav_row.append(InlineKeyboardButton(text=f"{page}/{total_pages}", callback_data="noop"))
-    if page < total_pages:
-        nav_row.append(InlineKeyboardButton(text="Далее \u25b6", callback_data=f"search:page:{page + 1}"))
-    buttons.append(nav_row)
+    if total_pages > 1:
+        nav_row = []
+        if page > 1:
+            nav_row.append(InlineKeyboardButton(text="\u25c0 Назад", callback_data=f"search:page:{page - 1}"))
+        nav_row.append(InlineKeyboardButton(text=f"{page}/{total_pages}", callback_data="noop"))
+        if page < total_pages:
+            nav_row.append(InlineKeyboardButton(text="Далее \u25b6", callback_data=f"search:page:{page + 1}"))
+        buttons.append(nav_row)
     if level < 3:
         buttons.append([
             InlineKeyboardButton(text="\U0001f50d Расширить поиск", callback_data="search:expand")

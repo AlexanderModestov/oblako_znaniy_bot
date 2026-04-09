@@ -94,13 +94,14 @@ def new_search_keyboard() -> InlineKeyboardBuilder:
 
 def search_pagination_keyboard(page: int, total_pages: int, level: int = 1) -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
-    nav_row = []
-    if page > 1:
-        nav_row.append(CallbackButton(text="\u25c0 Назад", payload=f"search:page:{page - 1}"))
-    nav_row.append(CallbackButton(text=f"{page}/{total_pages}", payload="noop"))
-    if page < total_pages:
-        nav_row.append(CallbackButton(text="Далее \u25b6", payload=f"search:page:{page + 1}"))
-    kb.row(*nav_row)
+    if total_pages > 1:
+        nav_row = []
+        if page > 1:
+            nav_row.append(CallbackButton(text="\u25c0 Назад", payload=f"search:page:{page - 1}"))
+        nav_row.append(CallbackButton(text=f"{page}/{total_pages}", payload="noop"))
+        if page < total_pages:
+            nav_row.append(CallbackButton(text="Далее \u25b6", payload=f"search:page:{page + 1}"))
+        kb.row(*nav_row)
     if level < 3:
         kb.row(CallbackButton(text="\U0001f50d Расширить поиск", payload="search:expand"))
     kb.row(CallbackButton(text="\U0001f504 Новый поиск", payload="new_search"))
