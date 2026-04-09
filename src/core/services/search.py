@@ -1,7 +1,8 @@
 import logging
+import re
 
 from openai import AsyncOpenAI
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -10,6 +11,8 @@ from src.core.models import Lesson
 from src.core.schemas import ClarifyOption, ClarifyResult, LessonResult, SearchResult
 
 logger = logging.getLogger(__name__)
+
+_ABBR_RE = re.compile(r"^[А-ЯЁA-Z]{2,5}$")
 
 
 def _build_tsquery(query: str):
@@ -25,6 +28,21 @@ def _build_tsquery_or(query: str):
     return func.websearch_to_tsquery("russian", " OR ".join(words))
 
 
+def _abbr_filters(query: str):
+    """Return SQLAlchemy conditions requiring each abbreviation to appear literally."""
+    conditions = []
+    for word in query.strip().split():
+        if _ABBR_RE.match(word):
+            pat = f"%{word}%"
+            conditions.append(or_(
+                Lesson.title.ilike(pat),
+                Lesson.description.ilike(pat),
+                Lesson.section.ilike(pat),
+                Lesson.topic.ilike(pat),
+            ))
+    return conditions
+
+
 class SearchService:
     def __init__(self):
         settings = get_settings()
@@ -35,8 +53,11 @@ class SearchService:
 
     async def fts_search(self, session: AsyncSession, query: str, page: int = 1, use_or: bool = False) -> tuple[list[LessonResult], int]:
         ts_query = _build_tsquery_or(query) if use_or else _build_tsquery(query)
+        abbr_conds = _abbr_filters(query)
 
         count_q = select(func.count(Lesson.id)).where(Lesson.search_vector.op("@@")(ts_query))
+        for cond in abbr_conds:
+            count_q = count_q.where(cond)
         count_result = await session.execute(count_q)
         total = count_result.scalar() or 0
 
@@ -49,6 +70,8 @@ class SearchService:
             .order_by(na_last, func.ts_rank(Lesson.search_vector, ts_query).desc())
             .offset(offset).limit(self.per_page)
         )
+        for cond in abbr_conds:
+            q = q.where(cond)
         result = await session.execute(q)
 
         lessons = [
@@ -203,6 +226,7 @@ class SearchService:
     async def fts_search_all(self, session: AsyncSession, query: str, use_or: bool = False) -> list[LessonResult]:
         """Fetch all FTS results without pagination (for clarification analysis)."""
         ts_query = _build_tsquery_or(query) if use_or else _build_tsquery(query)
+        abbr_conds = _abbr_filters(query)
         na_last = case((Lesson.url == "N/A", 1), else_=0)
         q = (
             select(Lesson)
@@ -210,6 +234,8 @@ class SearchService:
             .where(Lesson.search_vector.op("@@")(ts_query))
             .order_by(na_last, func.ts_rank(Lesson.search_vector, ts_query).desc())
         )
+        for cond in abbr_conds:
+            q = q.where(cond)
         result = await session.execute(q)
         return [
             LessonResult(
