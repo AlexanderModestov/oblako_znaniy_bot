@@ -1,4 +1,7 @@
+import logging
+
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
     CallbackQuery,
@@ -7,6 +10,8 @@ from aiogram.types import (
     Message,
     WebAppInfo,
 )
+
+logger = logging.getLogger(__name__)
 
 from src.config import get_settings
 from src.core.schemas import LessonResult, SearchResult
@@ -74,6 +79,15 @@ async def handle_expand(callback: CallbackQuery, state: FSMContext, session):
         await callback.answer()
 
 
+async def _safe_edit(callback: CallbackQuery, text: str, keyboard):
+    """Edit message, silently ignore 'message is not modified' error."""
+    try:
+        await callback.message.edit_text(text, reply_markup=keyboard)
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e):
+            raise
+
+
 async def _run_search(*, state: FSMContext, session, query: str, level: int, edit: bool,
                       message=None, callback=None):
     """Shared logic: fetch all lessons for level, check clarification, show results."""
@@ -93,7 +107,7 @@ async def _run_search(*, state: FSMContext, session, query: str, level: int, edi
         options = [o.model_dump() for o in clarification.options]
         keyboard = clarify_keyboard(options, clarification.level)
         if edit and callback:
-            await callback.message.edit_text(clarification.message, reply_markup=keyboard)
+            await _safe_edit(callback, clarification.message, keyboard)
         else:
             await message.answer(clarification.message, reply_markup=keyboard)
         return
@@ -115,7 +129,7 @@ async def _run_search(*, state: FSMContext, session, query: str, level: int, edi
         keyboard = None
 
     if edit and callback:
-        await callback.message.edit_text(text, reply_markup=keyboard)
+        await _safe_edit(callback, text, keyboard)
     else:
         await message.answer(text, reply_markup=keyboard)
 
