@@ -135,6 +135,17 @@ async def _run_search(*, event, context: MemoryContext, session, query: str, lev
             await event.message.answer(text)
 
 
+@router.message_callback(F.callback.payload == "clarify:back")
+async def handle_clarify_back(event: MessageCallback, context: MemoryContext, session: AsyncSession):
+    """Go back: re-run search at current level (re-triggers clarification from scratch)."""
+    data = await context.get_data()
+    query = data.get("search_query", "")
+    search_level = data.get("search_level", 1)
+    if not query:
+        return
+    await _run_search(event=event, context=context, session=session, query=query, level=search_level, edit=True)
+
+
 @router.message_callback(F.callback.payload.startswith("clarify:"))
 async def handle_clarification(event: MessageCallback, context: MemoryContext, session: AsyncSession):
     parts = event.callback.payload.split(":")

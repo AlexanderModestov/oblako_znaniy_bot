@@ -136,6 +136,9 @@ def clarify_keyboard(options: list[dict], level: str) -> InlineKeyboardMarkup:
         buttons.append([
             InlineKeyboardButton(text=opt["display"], callback_data=f"clarify:{level}:{i}")
         ])
+    buttons.append([
+        InlineKeyboardButton(text="\u25c0 Назад", callback_data="clarify:back")
+    ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 

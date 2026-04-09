@@ -120,6 +120,19 @@ async def _run_search(*, state: FSMContext, session, query: str, level: int, edi
         await message.answer(text, reply_markup=keyboard)
 
 
+@router.callback_query(F.data == "clarify:back")
+async def handle_clarify_back(callback: CallbackQuery, state: FSMContext, session):
+    """Go back: re-run search at current level (re-triggers clarification from scratch)."""
+    data = await state.get_data()
+    query = data.get("search_query", "")
+    search_level = data.get("search_level", 1)
+    if not query:
+        await callback.answer()
+        return
+    await _run_search(callback=callback, state=state, session=session, query=query, level=search_level, edit=True)
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("clarify:"))
 async def handle_clarification(callback: CallbackQuery, state: FSMContext, session):
     parts = callback.data.split(":")  # clarify:{level}:{index_or_all}

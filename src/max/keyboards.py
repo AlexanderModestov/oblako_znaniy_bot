@@ -116,6 +116,7 @@ def clarify_keyboard(options: list[dict], level: str) -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
     for i, opt in enumerate(options):
         kb.row(CallbackButton(text=opt["display"], payload=f"clarify:{level}:{i}"))
+    kb.row(CallbackButton(text="\u25c0 Назад", payload="clarify:back"))
     return kb
 
 
