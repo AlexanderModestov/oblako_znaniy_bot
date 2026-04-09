@@ -116,7 +116,7 @@ def search_pagination_keyboard(page: int, total_pages: int, level: int = 1) -> I
         if page < total_pages:
             nav_row.append(InlineKeyboardButton(text="Далее \u25b6", callback_data=f"search:page:{page + 1}"))
         buttons.append(nav_row)
-    if level < 3:
+    if level < 2:
         buttons.append([
             InlineKeyboardButton(text="\U0001f50d Расширить поиск", callback_data="search:expand")
         ])

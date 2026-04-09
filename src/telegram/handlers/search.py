@@ -72,7 +72,7 @@ async def handle_expand(callback: CallbackQuery, state: FSMContext, session):
         await callback.answer("Нет активного поиска.", show_alert=True)
         return
     current_level = data.get("search_level", 1)
-    new_level = min(current_level + 1, 3)
+    new_level = min(current_level + 1, 2)
     try:
         await _run_search(callback=callback, state=state, session=session, query=query, level=new_level, edit=True)
     finally:
@@ -120,14 +120,8 @@ async def _run_search(*, state: FSMContext, session, query: str, level: int, edi
     text = format_text_results(result)
     if level == 2:
         text += "\n\n\U0001f50e Расширенный поиск (семантика)"
-    elif level == 3:
-        text += "\n\n\U0001f50e Максимальный поиск"
-    if result.total_pages > 0:
-        keyboard = search_pagination_keyboard(1, result.total_pages, level)
-    elif level < 3:
-        keyboard = search_pagination_keyboard(1, 1, level)
-    else:
-        keyboard = None
+    total_pages = max(result.total_pages, 1)
+    keyboard = search_pagination_keyboard(1, total_pages, level)
 
     if edit and callback:
         await _safe_edit(callback, text, keyboard)
@@ -178,14 +172,8 @@ async def handle_clarify_back(callback: CallbackQuery, state: FSMContext, sessio
     text = format_text_results(result)
     if search_level == 2:
         text += "\n\n\U0001f50e Расширенный поиск (семантика)"
-    elif search_level == 3:
-        text += "\n\n\U0001f50e Максимальный поиск"
-    if result.total_pages > 0:
-        keyboard = search_pagination_keyboard(1, result.total_pages, search_level)
-    elif search_level < 3:
-        keyboard = search_pagination_keyboard(1, 1, search_level)
-    else:
-        keyboard = None
+    total_pages = max(result.total_pages, 1)
+    keyboard = search_pagination_keyboard(1, total_pages, search_level)
 
     await state.update_data(clarify_result=None, search_filtered=None)
     await _safe_edit(callback, text, keyboard)

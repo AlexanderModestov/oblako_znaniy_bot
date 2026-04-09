@@ -65,7 +65,7 @@ async def handle_expand(event: MessageCallback, context: MemoryContext, session:
     if not query:
         logger.warning("handle_expand: empty query, returning")
         return
-    new_level = min(current_level + 1, 3)
+    new_level = min(current_level + 1, 2)
     logger.info("handle_expand: expanding %d -> %d", current_level, new_level)
     await _run_search(event=event, context=context, session=session, query=query, level=new_level, edit=True)
 
@@ -105,35 +105,23 @@ async def _run_search(*, event, context: MemoryContext, session, query: str, lev
     text = format_text_results(result)
     if level == 2:
         text += "\n\n\U0001f50e Расширенный поиск (семантика)"
-    elif level == 3:
-        text += "\n\n\U0001f50e Максимальный поиск"
 
-    if result.total_pages > 0:
-        kb = search_pagination_keyboard(1, result.total_pages, level)
-    elif level < 3:
-        kb = search_pagination_keyboard(1, 1, level)
-    else:
-        kb = None
+    total_pages = max(result.total_pages, 1)
+    kb = search_pagination_keyboard(1, total_pages, level)
 
     logger.info("_run_search: level=%d, total=%d, text_len=%d, edit=%s", level, total, len(text), edit)
-    if kb:
-        if edit:
-            try:
-                await event.bot.edit_message(
-                    message_id=event.message.body.mid,
-                    text=text,
-                    attachments=[kb.as_markup()],
-                )
-                logger.info("_run_search: edit_message succeeded")
-            except Exception:
-                logger.exception("_run_search: edit_message failed")
-        else:
-            await event.message.answer(text, attachments=[kb.as_markup()])
+    if edit:
+        try:
+            await event.bot.edit_message(
+                message_id=event.message.body.mid,
+                text=text,
+                attachments=[kb.as_markup()],
+            )
+            logger.info("_run_search: edit_message succeeded")
+        except Exception:
+            logger.exception("_run_search: edit_message failed")
     else:
-        if edit:
-            await event.bot.edit_message(message_id=event.message.body.mid, text=text)
-        else:
-            await event.message.answer(text)
+        await event.message.answer(text, attachments=[kb.as_markup()])
 
 
 @router.message_callback(F.callback.payload == "clarify:back")
@@ -181,24 +169,16 @@ async def handle_clarify_back(event: MessageCallback, context: MemoryContext, se
     text = format_text_results(result)
     if search_level == 2:
         text += "\n\n\U0001f50e Расширенный поиск (семантика)"
-    elif search_level == 3:
-        text += "\n\n\U0001f50e Максимальный поиск"
-    if result.total_pages > 0:
-        kb = search_pagination_keyboard(1, result.total_pages, search_level)
-    elif search_level < 3:
-        kb = search_pagination_keyboard(1, 1, search_level)
-    else:
-        kb = None
+
+    total_pages = max(result.total_pages, 1)
+    kb = search_pagination_keyboard(1, total_pages, search_level)
 
     await context.update_data(clarify_result=None, search_filtered=None)
-    if kb:
-        await event.bot.edit_message(
-            message_id=event.message.body.mid,
-            text=text,
-            attachments=[kb.as_markup()],
-        )
-    else:
-        await event.bot.edit_message(message_id=event.message.body.mid, text=text)
+    await event.bot.edit_message(
+        message_id=event.message.body.mid,
+        text=text,
+        attachments=[kb.as_markup()],
+    )
 
 
 @router.message_callback(F.callback.payload.startswith("clarify:"))

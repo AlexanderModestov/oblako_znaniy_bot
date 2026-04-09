@@ -102,7 +102,7 @@ def search_pagination_keyboard(page: int, total_pages: int, level: int = 1) -> I
         if page < total_pages:
             nav_row.append(CallbackButton(text="Далее \u25b6", payload=f"search:page:{page + 1}"))
         kb.row(*nav_row)
-    if level < 3:
+    if level < 2:
         kb.row(CallbackButton(text="\U0001f50d Расширить поиск", payload="search:expand"))
     kb.row(CallbackButton(text="\U0001f504 Новый поиск", payload="new_search"))
     return kb
