@@ -34,3 +34,11 @@ def format_text_results(result: SearchResult) -> str:
         for i, l in enumerate(result.lessons)
     )
     return header + items
+
+
+def format_empty_level_2_results(query: str) -> str:
+    """Shown when the extended (level 2) search returned no lessons at all."""
+    return (
+        f'\U0001f50e Расширенный поиск по запросу \u00ab{query}\u00bb не дал результатов.\n\n'
+        "Попробуйте сформулировать запрос иначе."
+    )

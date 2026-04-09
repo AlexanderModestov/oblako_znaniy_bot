@@ -11,7 +11,7 @@ from src.config import get_settings
 from src.core.schemas import LessonResult, SearchResult
 from src.core.services.search import SearchService
 from src.core.services.user import UserService
-from src.max.formatters import format_text_results
+from src.max.formatters import format_empty_level_2_results, format_text_results
 from src.max.keyboards import clarify_keyboard, registration_keyboard, search_pagination_keyboard
 
 router = Router(router_id="max_search")
@@ -102,9 +102,12 @@ async def _run_search(*, event, context: MemoryContext, session, query: str, lev
     page_lessons = all_lessons[:per_page]
     total = len(all_lessons)
     result = SearchResult(query=query, lessons=page_lessons, total=total, page=1, per_page=per_page)
-    text = format_text_results(result)
-    if level == 2:
-        text += "\n\n\U0001f50e Расширенный поиск (семантика)"
+    if level == 2 and total == 0:
+        text = format_empty_level_2_results(query)
+    else:
+        text = format_text_results(result)
+        if level == 2:
+            text += "\n\n\U0001f50e Расширенный поиск (семантика)"
 
     total_pages = max(result.total_pages, 1)
     kb = search_pagination_keyboard(1, total_pages, level)
@@ -166,9 +169,12 @@ async def handle_clarify_back(event: MessageCallback, context: MemoryContext, se
     page_lessons = all_lessons[:per_page]
     total = len(all_lessons)
     result = SearchResult(query=query, lessons=page_lessons, total=total, page=1, per_page=per_page)
-    text = format_text_results(result)
-    if search_level == 2:
-        text += "\n\n\U0001f50e Расширенный поиск (семантика)"
+    if search_level == 2 and total == 0:
+        text = format_empty_level_2_results(query)
+    else:
+        text = format_text_results(result)
+        if search_level == 2:
+            text += "\n\n\U0001f50e Расширенный поиск (семантика)"
 
     total_pages = max(result.total_pages, 1)
     kb = search_pagination_keyboard(1, total_pages, search_level)
