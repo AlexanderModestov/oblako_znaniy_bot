@@ -25,6 +25,12 @@ search_service = SearchService()
 user_service = UserService()
 
 
+def _last_clarify_level(history: list[dict]) -> str | None:
+    if not history:
+        return None
+    return (history[-1].get("clarify_result") or {}).get("level")
+
+
 @router.message(F.text)
 async def handle_search(message: Message, state: FSMContext, session):
     """Catch-all: any text message from registered user triggers search."""
@@ -242,7 +248,12 @@ async def handle_clarification(callback: CallbackQuery, state: FSMContext, sessi
         clarify_history=history,
     )
 
-    keyboard = search_pagination_keyboard(1, search_result.total_pages, search_level) if search_result.total_pages > 0 else None
+    keyboard = search_pagination_keyboard(
+        1,
+        search_result.total_pages,
+        search_level,
+        back_to_clarify=_last_clarify_level(history),
+    ) if search_result.total_pages > 0 else None
     await _safe_edit(callback, text, keyboard)
     await callback.answer()
 
@@ -253,6 +264,8 @@ async def paginate_search(callback: CallbackQuery, state: FSMContext, session):
     data = await state.get_data()
     query = data.get("search_query", "")
     search_level = data.get("search_level", 1)
+    history = data.get("clarify_history", [])
+    back_to_clarify = _last_clarify_level(history)
 
     filtered_data = data.get("search_filtered")
     all_data = data.get("search_all_lessons")
@@ -265,7 +278,7 @@ async def paginate_search(callback: CallbackQuery, state: FSMContext, session):
         # Fallback: re-query level 1 from DB
         result = await search_service.search_by_level(session, query, level=1, page=page)
         text = format_text_results(result)
-        keyboard = search_pagination_keyboard(page, result.total_pages, search_level)
+        keyboard = search_pagination_keyboard(page, result.total_pages, search_level, back_to_clarify=back_to_clarify)
         await callback.message.edit_text(text, reply_markup=keyboard)
         await callback.answer()
         return
@@ -275,6 +288,6 @@ async def paginate_search(callback: CallbackQuery, state: FSMContext, session):
     page_lessons = lessons[offset: offset + per_page]
     result = SearchResult(query=query, lessons=page_lessons, total=len(lessons), page=page, per_page=per_page)
     text = format_text_results(result)
-    keyboard = search_pagination_keyboard(page, result.total_pages, search_level)
+    keyboard = search_pagination_keyboard(page, result.total_pages, search_level, back_to_clarify=back_to_clarify)
     await callback.message.edit_text(text, reply_markup=keyboard)
     await callback.answer()

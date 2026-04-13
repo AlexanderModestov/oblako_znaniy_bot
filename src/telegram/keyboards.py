@@ -106,7 +106,18 @@ def paginated_items_keyboard(
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def search_pagination_keyboard(page: int, total_pages: int, level: int = 1) -> InlineKeyboardMarkup:
+_BACK_TO_CLARIFY_LABELS = {
+    "subject": "\u25c0 К выбору предмета",
+    "grade": "\u25c0 К выбору класса",
+}
+
+
+def search_pagination_keyboard(
+    page: int,
+    total_pages: int,
+    level: int = 1,
+    back_to_clarify: str | None = None,
+) -> InlineKeyboardMarkup:
     buttons = []
     if total_pages > 1:
         nav_row = []
@@ -119,6 +130,11 @@ def search_pagination_keyboard(page: int, total_pages: int, level: int = 1) -> I
     if level < 2:
         buttons.append([
             InlineKeyboardButton(text="\U0001f50d Расширить поиск", callback_data="search:expand")
+        ])
+    if back_to_clarify is not None:
+        label = _BACK_TO_CLARIFY_LABELS.get(back_to_clarify, "\u25c0 К уточнению")
+        buttons.append([
+            InlineKeyboardButton(text=label, callback_data="clarify:back")
         ])
     buttons.append([
         InlineKeyboardButton(text="\U0001f504 Новый поиск", callback_data="new_search")
