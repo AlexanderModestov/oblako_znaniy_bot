@@ -19,6 +19,12 @@ search_service = SearchService()
 user_service = UserService()
 
 
+def _last_clarify_level(history: list[dict]) -> str | None:
+    if not history:
+        return None
+    return (history[-1].get("clarify_result") or {}).get("level")
+
+
 @router.message_created(F.message.body.text)
 async def handle_search(event: MessageCreated, context: MemoryContext, session: AsyncSession):
     """Catch-all: any text message from registered user triggers search."""
@@ -246,7 +252,10 @@ async def handle_clarification(event: MessageCallback, context: MemoryContext, s
     )
 
     if search_result.total_pages > 0:
-        kb = search_pagination_keyboard(1, search_result.total_pages, search_level)
+        kb = search_pagination_keyboard(
+            1, search_result.total_pages, search_level,
+            back_to_clarify=_last_clarify_level(history),
+        )
         await event.bot.edit_message(
             message_id=event.message.body.mid,
             text=text,
@@ -262,6 +271,8 @@ async def paginate_search(event: MessageCallback, context: MemoryContext, sessio
     data = await context.get_data()
     query = data.get("search_query", "")
     search_level = data.get("search_level", 1)
+    history = data.get("clarify_history", [])
+    back_to_clarify = _last_clarify_level(history)
 
     filtered_data = data.get("search_filtered")
     all_data = data.get("search_all_lessons")
@@ -273,7 +284,9 @@ async def paginate_search(event: MessageCallback, context: MemoryContext, sessio
     else:
         result = await search_service.search_by_level(session, query, level=1, page=page)
         text = format_text_results(result)
-        kb = search_pagination_keyboard(page, result.total_pages, search_level)
+        kb = search_pagination_keyboard(
+            page, result.total_pages, search_level, back_to_clarify=back_to_clarify,
+        )
         await event.bot.edit_message(
             message_id=event.message.body.mid,
             text=text,
@@ -286,7 +299,9 @@ async def paginate_search(event: MessageCallback, context: MemoryContext, sessio
     page_lessons = lessons[offset: offset + per_page]
     result = SearchResult(query=query, lessons=page_lessons, total=len(lessons), page=page, per_page=per_page)
     text = format_text_results(result)
-    kb = search_pagination_keyboard(page, result.total_pages, search_level)
+    kb = search_pagination_keyboard(
+        page, result.total_pages, search_level, back_to_clarify=back_to_clarify,
+    )
     await event.bot.edit_message(
         message_id=event.message.body.mid,
         text=text,

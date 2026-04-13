@@ -92,7 +92,18 @@ def new_search_keyboard() -> InlineKeyboardBuilder:
     return kb
 
 
-def search_pagination_keyboard(page: int, total_pages: int, level: int = 1) -> InlineKeyboardBuilder:
+_BACK_TO_CLARIFY_LABELS = {
+    "subject": "\u25c0 К выбору предмета",
+    "grade": "\u25c0 К выбору класса",
+}
+
+
+def search_pagination_keyboard(
+    page: int,
+    total_pages: int,
+    level: int = 1,
+    back_to_clarify: str | None = None,
+) -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
     if total_pages > 1:
         nav_row = []
@@ -104,6 +115,9 @@ def search_pagination_keyboard(page: int, total_pages: int, level: int = 1) -> I
         kb.row(*nav_row)
     if level < 2:
         kb.row(CallbackButton(text="\U0001f50d Расширить поиск", payload="search:expand"))
+    if back_to_clarify is not None:
+        label = _BACK_TO_CLARIFY_LABELS.get(back_to_clarify, "\u25c0 К уточнению")
+        kb.row(CallbackButton(text=label, payload="clarify:back"))
     kb.row(CallbackButton(text="\U0001f504 Новый поиск", payload="new_search"))
     return kb
 
