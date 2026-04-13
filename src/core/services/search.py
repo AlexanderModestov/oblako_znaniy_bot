@@ -2,7 +2,7 @@ import logging
 import re
 
 from openai import AsyncOpenAI
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -21,17 +21,11 @@ def _build_tsquery(query: str):
 
 
 def _abbr_filters(query: str):
-    """Return SQLAlchemy conditions requiring each abbreviation to appear literally."""
+    """Return SQLAlchemy conditions requiring each abbreviation to appear literally in title."""
     conditions = []
     for word in query.strip().split():
         if _ABBR_RE.match(word):
-            pat = f"%{word}%"
-            conditions.append(or_(
-                Lesson.title.ilike(pat),
-                Lesson.description.ilike(pat),
-                Lesson.section.ilike(pat),
-                Lesson.topic.ilike(pat),
-            ))
+            conditions.append(Lesson.title.ilike(f"%{word}%"))
     return conditions
 
 
