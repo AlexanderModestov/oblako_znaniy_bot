@@ -22,11 +22,11 @@ def test_normalize_empty_string():
 
 
 def test_build_or_tsquery_single_token():
-    assert _build_or_tsquery_string(["теорема"]) == "теорема:*"
+    assert _build_or_tsquery_string(["теорема"]) == "теорема"
 
 
 def test_build_or_tsquery_multi_tokens():
-    assert _build_or_tsquery_string(["теорема", "пифагора"]) == "теорема:* | пифагора:*"
+    assert _build_or_tsquery_string(["теорема", "пифагора"]) == "теорема | пифагора"
 
 
 def test_build_or_tsquery_empty():
@@ -34,7 +34,7 @@ def test_build_or_tsquery_empty():
 
 
 def test_build_or_tsquery_digit_no_prefix():
-    assert _build_or_tsquery_string(["2", "закон"]) == "2 | закон:*"
+    assert _build_or_tsquery_string(["2", "закон"]) == "2 | закон"
 
 
 def test_build_or_tsquery_all_digits():

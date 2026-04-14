@@ -51,12 +51,11 @@ def _normalize_tokens(query: str) -> list[str]:
 
 
 def _build_or_tsquery_string(tokens: list[str]) -> str:
-    """Build a tsquery OR-string. Word tokens get prefix matching ('закон:*');
-    pure-digit tokens stay exact ('2') — otherwise '2:*' matches any number
-    starting with 2 (2000, 2008, 2012, ...), flooding queries like
-    '2 закон ньютона' with year-based history lessons."""
-    parts = [t if t.isdigit() else f"{t}:*" for t in tokens]
-    return " | ".join(parts)
+    """Build a tsquery OR-string. No prefix matching — the Russian Snowball
+    stemmer inside to_tsquery already normalizes tokens to their stem form.
+    Prefix matching was removed after it caused false matches on short
+    tokens (физ:* → физико-химический, see baseline 2026-04-14)."""
+    return " | ".join(tokens)
 
 
 def _build_tsquery(query: str):
