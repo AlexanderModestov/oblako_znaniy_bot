@@ -31,3 +31,11 @@ def test_build_or_tsquery_multi_tokens():
 
 def test_build_or_tsquery_empty():
     assert _build_or_tsquery_string([]) == ""
+
+
+def test_build_or_tsquery_digit_no_prefix():
+    assert _build_or_tsquery_string(["2", "закон"]) == "2 | закон:*"
+
+
+def test_build_or_tsquery_all_digits():
+    assert _build_or_tsquery_string(["7", "11"]) == "7 | 11"
