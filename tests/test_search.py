@@ -259,3 +259,43 @@ async def test_compute_idf_empty_tokens_returns_empty():
     weights = await _compute_idf(mock_session, [])
     assert weights == {}
     mock_session.execute.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_compute_idf_single_digit_token_gets_zero_weight():
+    """A lone '2' is an ordinal modifier, not a keyword — weight 0."""
+    from src.core.services.search import _compute_idf
+
+    mock_session = MagicMock()
+    scalars = iter([1000, 50])  # total_n, df for 'ньютон'
+
+    async def fake_execute(_q, _params=None):
+        result = MagicMock()
+        result.scalar = MagicMock(return_value=next(scalars))
+        return result
+
+    mock_session.execute = fake_execute
+
+    weights = await _compute_idf(mock_session, ["2", "ньютон"])
+
+    assert weights["2"] == 0.0
+    assert weights["ньютон"] > 0
+
+
+@pytest.mark.asyncio
+async def test_compute_idf_multidigit_kept():
+    """Multi-digit tokens like '2024' stay real keywords."""
+    from src.core.services.search import _compute_idf
+
+    mock_session = MagicMock()
+    scalars = iter([1000, 5])  # total_n, df for '2024'
+
+    async def fake_execute(_q, _params=None):
+        result = MagicMock()
+        result.scalar = MagicMock(return_value=next(scalars))
+        return result
+
+    mock_session.execute = fake_execute
+
+    weights = await _compute_idf(mock_session, ["2024"])
+    assert weights["2024"] > 0

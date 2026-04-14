@@ -64,7 +64,13 @@ async def _compute_idf(session, tokens: list[str]) -> dict[str, float]:
     positive for any token (even one matching all rows, where it returns 1),
     and strictly monotonic — rarer tokens always outweigh common ones.
 
-    One ``count(*)`` per token (GIN-indexed, cheap) plus one for N.
+    Single-character digit tokens get weight 0 — they are typically ordinal
+    modifiers (e.g. ``'2'`` in ``'2 закон ньютона'``) rather than search
+    keywords, and their rarity in the corpus would otherwise inflate IDF and
+    dominate the ranking. Multi-digit numbers (``'2024'``, ``'10'``) keep
+    their real IDF so grade/year queries still work.
+
+    One ``count(*)`` per non-skipped token (GIN-indexed, cheap) plus one for N.
     """
     if not tokens:
         return {}
@@ -77,6 +83,9 @@ async def _compute_idf(session, tokens: list[str]) -> dict[str, float]:
 
     weights: dict[str, float] = {}
     for tok in tokens:
+        if tok.isdigit() and len(tok) == 1:
+            weights[tok] = 0.0
+            continue
         df_row = await session.execute(
             text(
                 "SELECT COUNT(*) FROM lessons "
@@ -152,12 +161,16 @@ class SearchService:
     async def fts_search_fuzzy(
         self, session: AsyncSession, query: str, page: int = 1
     ) -> tuple[list[LessonResult], int]:
-        """Score rows by sum of IDF weights of matching tokens.
+        """Score rows by IDF-weighted ``ts_rank_cd`` of matching tokens.
 
         Candidate set: rows whose search_vector matches any token (OR-tsquery).
-        Score per row: Σ idf_i * (search_vector @@ tok_i). Rare-token matches
-        dominate — 'ньютон' outweighs 'закон' so 'Второй закон Ньютона' beats
-        'Закон больших чисел' on the query '2 закон ньютона'.
+        Score per row: Σ idf_i * ts_rank_cd(l.search_vector, tok_i).
+        ``ts_rank_cd`` honors the A/B/C weights set by migration 013 —
+        title ('A', 1.0) outweighs section+topic ('B', 0.4) and description
+        ('C', 0.2) via Postgres defaults, so title hits rank above
+        description-only hits. Rare-token matches still dominate — 'ньютон'
+        outweighs 'закон' so 'Второй закон Ньютона' beats 'Закон больших
+        чисел' on the query '2 закон ньютона'.
 
         No prefix matching (Snowball stemmer handles morphology).
         No trigram fallback (removed 2026-04-14 after baseline showed it
@@ -180,8 +193,8 @@ class SearchService:
             params[key_tok] = tok
             params[key_w] = float(weights.get(tok, 1.0))
             score_parts.append(
-                f"(CASE WHEN l.search_vector @@ to_tsquery('russian', cast(:{key_tok} as text)) "
-                f"THEN cast(:{key_w} as float) ELSE 0 END)"
+                f"(ts_rank_cd(l.search_vector, to_tsquery('russian', cast(:{key_tok} as text))) "
+                f"* cast(:{key_w} as float))"
             )
         score_expr = " + ".join(score_parts) if score_parts else "0"
 
