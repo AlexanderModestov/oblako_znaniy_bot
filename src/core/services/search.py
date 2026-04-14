@@ -1,14 +1,13 @@
 """Lesson search service.
 
 Level 1 (lexical) routes through ``fts_search_fuzzy`` when
-``settings.enable_fuzzy_search`` is True: an OR-FTS with prefix matching
-on ``search_vector`` unioned with a pg_trgm similarity fallback on
-``title``, ranked on a single 0..1 score. When the flag is False, the
-strict AND ``plainto_tsquery`` path (``fts_search``) is used — kept as a
-rollback. Level 2 (lexical + semantic embeddings) is unaffected.
+``settings.enable_fuzzy_search`` is True: an OR-tsquery on
+``search_vector``, ranked by the sum of per-token IDF weights. When
+the flag is False, the strict AND ``plainto_tsquery`` path
+(``fts_search``) is used — kept as a rollback. Level 2 (lexical +
+semantic embeddings) is unaffected.
 
-See ``docs/plans/2026-04-13-soft-search-design.md`` and
-``docs/plans/2026-04-14-soft-search-implementation.md`` for rationale.
+See ``docs/plans/2026-04-14-search-quality-design.md`` for rationale.
 """
 
 import logging
@@ -111,9 +110,6 @@ class SearchService:
         self.similarity_threshold = settings.semantic_similarity_threshold
         self.per_page = settings.results_per_page
         self.clarify_threshold = settings.search_clarify_threshold
-        self.trigram_threshold = settings.trigram_similarity_threshold
-        self.trigram_title_w = settings.trigram_title_weight
-        self.fts_floor = settings.fts_score_floor
         self.fuzzy_enabled = settings.enable_fuzzy_search
 
     async def fts_search(self, session: AsyncSession, query: str, page: int = 1) -> tuple[list[LessonResult], int]:
@@ -156,71 +152,53 @@ class SearchService:
     async def fts_search_fuzzy(
         self, session: AsyncSession, query: str, page: int = 1
     ) -> tuple[list[LessonResult], int]:
-        """OR-FTS with prefix, unioned with pg_trgm fallback on title.
-        Returns (page_results, total_count)."""
+        """Score rows by sum of IDF weights of matching tokens.
+
+        Candidate set: rows whose search_vector matches any token (OR-tsquery).
+        Score per row: Σ idf_i * (search_vector @@ tok_i). Rare-token matches
+        dominate — 'ньютон' outweighs 'закон' so 'Второй закон Ньютона' beats
+        'Закон больших чисел' on the query '2 закон ньютона'.
+
+        No prefix matching (Snowball stemmer handles morphology).
+        No trigram fallback (removed 2026-04-14 after baseline showed it
+        added noise for multi-word queries).
+        """
         from sqlalchemy import text
 
         tokens = _normalize_tokens(query)
         if not tokens:
             return [], 0
 
-        ts_str = _build_or_tsquery_string(tokens)
-        full_q = " ".join(tokens)
-        thr = self.trigram_threshold
-        floor = self.fts_floor
-        title_w = self.trigram_title_w
+        or_ts = _build_or_tsquery_string(tokens)
+        weights = await _compute_idf(session, tokens)
 
-        params: dict = {"ts": ts_str, "q": full_q, "thr": thr}
-        coverage_parts = []
-        for i, t in enumerate(tokens):
-            key = f"tok{i}"
-            params[key] = t if t.isdigit() else f"{t}:*"
-            coverage_parts.append(
-                f"(CASE WHEN search_vector @@ to_tsquery('russian', cast(:{key} as text)) "
-                "THEN 1 ELSE 0 END)"
+        params: dict = {"or_ts": or_ts}
+        score_parts: list[str] = []
+        for i, tok in enumerate(tokens):
+            key_tok = f"tok{i}"
+            key_w = f"w{i}"
+            params[key_tok] = tok
+            params[key_w] = float(weights.get(tok, 1.0))
+            score_parts.append(
+                f"(CASE WHEN l.search_vector @@ to_tsquery('russian', cast(:{key_tok} as text)) "
+                f"THEN cast(:{key_w} as float) ELSE 0 END)"
             )
-        coverage_expr = " + ".join(coverage_parts) if coverage_parts else "0"
+        score_expr = " + ".join(score_parts) if score_parts else "0"
 
         sql = text(f"""
-            WITH fts AS (
-                SELECT id,
-                       ({coverage_expr}) AS coverage,
-                       {floor} + {1 - floor} * LEAST(ts_rank(search_vector, to_tsquery('russian', cast(:ts as text))), 1.0) AS score
-                FROM lessons
-                WHERE search_vector @@ to_tsquery('russian', cast(:ts as text))
-            ),
-            trg AS (
-                SELECT id,
-                       0 AS coverage,
-                       {title_w} * similarity(title, cast(:q as text)) AS score
-                FROM lessons
-                WHERE similarity(title, cast(:q as text)) > cast(:thr as float)
-            ),
-            merged AS (
-                SELECT id,
-                       MAX(coverage) AS coverage,
-                       MAX(score) AS score
-                FROM (
-                    SELECT id, coverage, score FROM fts
-                    UNION ALL
-                    SELECT id, coverage, score FROM trg
-                ) u
-                GROUP BY id
-            )
-            SELECT m.id, m.score, m.coverage
-            FROM merged m
-            JOIN lessons l ON l.id = m.id
+            SELECT l.id, ({score_expr}) AS score
+            FROM lessons l
+            WHERE l.search_vector @@ to_tsquery('russian', cast(:or_ts as text))
             ORDER BY (CASE WHEN l.url = 'N/A' THEN 1 ELSE 0 END),
-                     m.coverage DESC,
-                     m.score DESC,
-                     m.id
+                     score DESC,
+                     l.id
         """)
 
         rows = (await session.execute(sql, params)).all()
-
         total = len(rows)
+
         offset = (page - 1) * self.per_page
-        page_ids = [r.id for r in rows[offset:offset + self.per_page]]
+        page_ids = [r.id for r in rows[offset: offset + self.per_page]]
         if not page_ids:
             return [], total
 
