@@ -304,6 +304,22 @@ class SearchService:
 
         return None
 
+    async def fts_search_all_fuzzy(
+        self, session: AsyncSession, query: str
+    ) -> list[LessonResult]:
+        """Same as fts_search_fuzzy but returns all hits (no pagination)."""
+        all_lessons: list[LessonResult] = []
+        page = 1
+        while True:
+            batch, total = await self.fts_search_fuzzy(session, query, page=page)
+            if not batch:
+                break
+            all_lessons.extend(batch)
+            if len(all_lessons) >= total:
+                break
+            page += 1
+        return all_lessons
+
     async def fts_search_all(self, session: AsyncSession, query: str) -> list[LessonResult]:
         """Fetch all FTS results without pagination (for clarification analysis)."""
         ts_query = _build_tsquery(query)
