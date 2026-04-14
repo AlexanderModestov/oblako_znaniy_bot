@@ -14,9 +14,11 @@ def format_lesson_text(lesson: LessonResult, index: int) -> str:
     grade_str = f"{lesson.grade} класс" if lesson.grade else None
     parts = [p for p in [lesson.subject, grade_str, lesson.section, lesson.topic] if p]
     context = " | ".join(parts)
+    snippet_line = f"\n   \U0001f4ac {lesson.snippet}" if lesson.snippet else ""
     return (
         f"{index}. {semantic_mark}{context}\n"
-        f"   \U0001f4da {lesson.title}\n"
+        f"   \U0001f4da {lesson.title}"
+        f"{snippet_line}\n"
         f"{_url_line(lesson.url, '   ')}"
     )
 

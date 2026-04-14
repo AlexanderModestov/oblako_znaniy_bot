@@ -61,6 +61,46 @@ def _build_or_tsquery_string(tokens: list[str]) -> str:
     return " | ".join(tokens)
 
 
+async def _fetch_snippets(
+    session,
+    ids: list[int],
+    tsquery_sql: str,
+    tsquery_params: dict,
+) -> dict[int, str]:
+    """Compute ``ts_headline`` snippets over ``description`` for the given ids.
+
+    ``tsquery_sql`` is a SQL expression that produces a tsquery — callers
+    pass ``"to_tsquery('russian', cast(:or_ts as text))"`` or
+    ``"plainto_tsquery('russian', cast(:q as text))"`` depending on path.
+    Returns only rows where the query actually matched inside the
+    description (detected via unique ``<<M>> / <</M>>`` markers, stripped
+    on the way out). Callers get a plain-text snippet with whitespace
+    cleaned up."""
+    from sqlalchemy import bindparam
+    from sqlalchemy import text as sa_text
+
+    if not ids:
+        return {}
+    sql = sa_text(
+        f"""
+        SELECT id, ts_headline(
+            'russian', coalesce(description, ''),
+            {tsquery_sql},
+            'MaxWords=20,MinWords=10,MaxFragments=1,StartSel=<<M>>,StopSel=<</M>>'
+        ) AS snippet
+        FROM lessons
+        WHERE id IN :ids
+        """
+    ).bindparams(bindparam("ids", expanding=True))
+    rows = (await session.execute(sql, {**tsquery_params, "ids": ids})).all()
+    out: dict[int, str] = {}
+    for r in rows:
+        if r.snippet and "<<M>>" in r.snippet:
+            cleaned = r.snippet.replace("<<M>>", "").replace("<</M>>", "")
+            out[r.id] = " ".join(cleaned.split())
+    return out
+
+
 async def _compute_idf(session, tokens: list[str]) -> dict[str, float]:
     """Compute IDF weight per token against the ``lessons`` corpus.
 
@@ -147,6 +187,14 @@ class SearchService:
         for cond in abbr_conds:
             q = q.where(cond)
         result = await session.execute(q)
+        rows = result.scalars().unique().all()
+
+        snippets = await _fetch_snippets(
+            session,
+            [l.id for l in rows],
+            "plainto_tsquery('russian', cast(:q as text))",
+            {"q": query},
+        )
 
         lessons = [
             LessonResult(
@@ -157,8 +205,9 @@ class SearchService:
                 section=l.section,
                 topic=l.topic,
                 is_semantic=False,
+                snippet=snippets.get(l.id),
             )
-            for l in result.scalars().unique().all()
+            for l in rows
         ]
         return lessons, total
 
@@ -241,6 +290,13 @@ class SearchService:
         result = await session.execute(q)
         by_id = {l.id: l for l in result.scalars().unique().all()}
 
+        snippets = await _fetch_snippets(
+            session,
+            page_ids,
+            "to_tsquery('russian', cast(:or_ts as text))",
+            {"or_ts": or_ts},
+        )
+
         lessons = [
             LessonResult(
                 title=by_id[i].title, url=by_id[i].url,
@@ -250,6 +306,7 @@ class SearchService:
                 section=by_id[i].section,
                 topic=by_id[i].topic,
                 is_semantic=False,
+                snippet=snippets.get(i),
             )
             for i in page_ids if i in by_id
         ]

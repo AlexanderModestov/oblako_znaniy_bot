@@ -31,6 +31,7 @@ class LessonResult(BaseModel):
     section: str | None = None
     topic: str | None = None
     is_semantic: bool = False
+    snippet: str | None = None
 
 
 class SearchResult(BaseModel):

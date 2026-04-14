@@ -388,3 +388,29 @@ async def test_semantic_search_caches_query_embedding(mock_settings):
 
     assert created_calls["n"] == 1
     assert "теорема пифагора" in search_module._EMBEDDING_CACHE
+
+
+def test_format_lesson_text_includes_snippet_when_present():
+    """Formatters must render the snippet line when LessonResult.snippet is set."""
+    from src.telegram.formatters import format_lesson_text as fmt_tg
+    from src.max.formatters import format_lesson_text as fmt_max
+
+    lesson = LessonResult(
+        title="ОГЭ литература линия №5",
+        url="https://example.com",
+        subject="Литература",
+        grade=9,
+        snippet="...стихотворение А. С. Пушкина \"Узник\"...",
+    )
+    for fmt in (fmt_tg, fmt_max):
+        text = fmt(lesson, 1)
+        assert "\U0001f4ac" in text
+        assert "Пушкина" in text
+
+
+def test_format_lesson_text_omits_snippet_line_when_absent():
+    from src.telegram.formatters import format_lesson_text as fmt_tg
+
+    lesson = LessonResult(title="T", url="https://x", subject="S", grade=5)
+    text = fmt_tg(lesson, 1)
+    assert "\U0001f4ac" not in text
