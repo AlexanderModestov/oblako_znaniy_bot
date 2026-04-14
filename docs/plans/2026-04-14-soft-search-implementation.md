@@ -587,6 +587,34 @@ git commit -m "docs(search): log manual verification results"
 
 ---
 
+## Verification log
+
+To be filled after running Task 10 against dev PostgreSQL.
+
+**Pre-flight:**
+- [ ] `alembic upgrade head` applies migration 012
+- [ ] `pg_trgm` extension present
+- [ ] `lessons_title_trgm_idx` created
+
+**Functional — extra words:**
+- [ ] "задачи на теорему пифагора 8 класс" → matches "теорема Пифагора"
+- [ ] "теорема пифагора" → no precision regression
+
+**Functional — typos:**
+- [ ] "теорма пифагра" → "теорема Пифагора" in top 5
+- [ ] "пифагр" → relevant results
+- [ ] "ъъъ" → empty
+
+**Rollback:**
+- [ ] `ENABLE_FUZZY_SEARCH=false` restores strict AND ("теорма" → 0)
+
+**Edge:**
+- [ ] "а" → empty
+- [ ] "7 класс" → grade-7 lessons
+- [ ] "математика 7 класс" → clarification fires when >10 results
+
+---
+
 ## Completion criteria
 
 - All automated tests green: `pytest tests/ -v`
