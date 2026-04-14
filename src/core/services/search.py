@@ -30,6 +30,12 @@ _ABBR_RE = re.compile(r"^[А-ЯЁA-Z]{2,5}$")
 _TSQUERY_SPECIALS = re.compile(r"[&|!():*]")
 _SPLIT_RE = re.compile(r"\s+")
 
+_STOPWORDS = frozenset({
+    "по", "к", "на", "и", "в", "с", "от", "для", "о", "об", "при",
+    "через", "над", "под", "без", "из", "у", "же", "ли", "бы", "не",
+    "а", "но", "или", "как", "что", "это", "то",
+})
+
 
 def _normalize_tokens(query: str) -> list[str]:
     """Lowercase, strip tsquery specials, split into tokens,
@@ -38,7 +44,10 @@ def _normalize_tokens(query: str) -> list[str]:
         return []
     cleaned = _TSQUERY_SPECIALS.sub(" ", query.lower())
     raw = [t.strip(".,;:!?\"'()[]{}") for t in _SPLIT_RE.split(cleaned)]
-    return [t for t in raw if t and (len(t) >= 2 or t.isdigit())]
+    return [
+        t for t in raw
+        if t and (len(t) >= 2 or t.isdigit()) and t not in _STOPWORDS
+    ]
 
 
 def _build_or_tsquery_string(tokens: list[str]) -> str:

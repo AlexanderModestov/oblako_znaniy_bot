@@ -39,3 +39,11 @@ def test_build_or_tsquery_digit_no_prefix():
 
 def test_build_or_tsquery_all_digits():
     assert _build_or_tsquery_string(["7", "11"]) == "7 | 11"
+
+
+def test_normalize_filters_russian_stopwords():
+    assert _normalize_tokens("лабораторные по физике") == ["лабораторные", "физике"]
+
+
+def test_normalize_keeps_only_stopwords_returns_empty():
+    assert _normalize_tokens("по на в") == []
