@@ -1,3 +1,16 @@
+"""Lesson search service.
+
+Level 1 (lexical) routes through ``fts_search_fuzzy`` when
+``settings.enable_fuzzy_search`` is True: an OR-FTS with prefix matching
+on ``search_vector`` unioned with a pg_trgm similarity fallback on
+``title``, ranked on a single 0..1 score. When the flag is False, the
+strict AND ``plainto_tsquery`` path (``fts_search``) is used — kept as a
+rollback. Level 2 (lexical + semantic embeddings) is unaffected.
+
+See ``docs/plans/2026-04-13-soft-search-design.md`` and
+``docs/plans/2026-04-14-soft-search-implementation.md`` for rationale.
+"""
+
 import logging
 import re
 
