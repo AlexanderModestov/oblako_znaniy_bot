@@ -29,6 +29,10 @@ _ABBR_RE = re.compile(r"^[А-ЯЁA-Z]{2,5}$")
 _TSQUERY_SPECIALS = re.compile(r"[&|!():*]")
 _SPLIT_RE = re.compile(r"\s+")
 
+_EMBEDDING_CACHE: dict[str, list[float]] = {}
+_EMBEDDING_CACHE_MAX = 1000
+
+
 _STOPWORDS = frozenset({
     "по", "к", "на", "и", "в", "с", "от", "для", "о", "об", "при",
     "через", "над", "под", "без", "из", "у", "же", "ли", "бы", "не",
@@ -252,14 +256,20 @@ class SearchService:
         return lessons, total
 
     async def semantic_search(self, session: AsyncSession, query: str, exclude_ids: list[int] | None = None, limit: int = 10) -> list[LessonResult]:
-        try:
-            settings = get_settings()
-            client = AsyncOpenAI(api_key=settings.openai_api_key)
-            response = await client.embeddings.create(model="text-embedding-3-small", input=query)
-            query_embedding = response.data[0].embedding
-        except Exception:
-            logger.exception("Failed to generate query embedding")
-            return []
+        cache_key = query.strip().lower()
+        query_embedding = _EMBEDDING_CACHE.get(cache_key)
+        if query_embedding is None:
+            try:
+                settings = get_settings()
+                client = AsyncOpenAI(api_key=settings.openai_api_key)
+                response = await client.embeddings.create(model="text-embedding-3-small", input=query)
+                query_embedding = response.data[0].embedding
+            except Exception:
+                logger.exception("Failed to generate query embedding")
+                return []
+            if len(_EMBEDDING_CACHE) >= _EMBEDDING_CACHE_MAX:
+                _EMBEDDING_CACHE.clear()
+            _EMBEDDING_CACHE[cache_key] = query_embedding
 
         q = (
             select(Lesson, Lesson.embedding.cosine_distance(query_embedding).label("distance"))

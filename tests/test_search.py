@@ -354,3 +354,37 @@ async def test_fuzzy_search_no_abbreviation_no_boost(mock_settings):
     await service.fts_search_fuzzy(mock_session, "второй закон ньютона", page=1)
 
     assert "ILIKE" not in captured["sql"]
+
+
+@pytest.mark.asyncio
+@patch("src.core.services.search.get_settings", side_effect=_make_mock_settings)
+async def test_semantic_search_caches_query_embedding(mock_settings):
+    """Second call with the same query must not re-invoke the OpenAI client."""
+    from src.core.services import search as search_module
+
+    search_module._EMBEDDING_CACHE.clear()
+
+    service = SearchService()
+    embedding = [0.1] * 1536
+    created_calls = {"n": 0}
+
+    class _FakeEmbeddings:
+        async def create(self, model, input):
+            created_calls["n"] += 1
+            return MagicMock(data=[MagicMock(embedding=embedding)])
+
+    class _FakeClient:
+        def __init__(self, *a, **kw):
+            self.embeddings = _FakeEmbeddings()
+
+    mock_session = MagicMock()
+    mock_session.execute = AsyncMock(
+        return_value=MagicMock(all=MagicMock(return_value=[]))
+    )
+
+    with patch("src.core.services.search.AsyncOpenAI", _FakeClient):
+        await service.semantic_search(mock_session, "теорема Пифагора")
+        await service.semantic_search(mock_session, "  Теорема Пифагора  ")
+
+    assert created_calls["n"] == 1
+    assert "теорема пифагора" in search_module._EMBEDDING_CACHE
