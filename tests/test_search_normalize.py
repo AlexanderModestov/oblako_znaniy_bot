@@ -1,4 +1,4 @@
-from src.core.services.search import _normalize_tokens
+from src.core.services.search import _normalize_tokens, _build_or_tsquery_string
 
 
 def test_normalize_splits_and_lowercases():
@@ -19,3 +19,15 @@ def test_normalize_strips_tsquery_specials():
 
 def test_normalize_empty_string():
     assert _normalize_tokens("   ") == []
+
+
+def test_build_or_tsquery_single_token():
+    assert _build_or_tsquery_string(["теорема"]) == "теорема:*"
+
+
+def test_build_or_tsquery_multi_tokens():
+    assert _build_or_tsquery_string(["теорема", "пифагора"]) == "теорема:* | пифагора:*"
+
+
+def test_build_or_tsquery_empty():
+    assert _build_or_tsquery_string([]) == ""

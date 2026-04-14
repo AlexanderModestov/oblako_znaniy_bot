@@ -28,6 +28,11 @@ def _normalize_tokens(query: str) -> list[str]:
     return [t for t in raw if t and (len(t) >= 2 or t.isdigit())]
 
 
+def _build_or_tsquery_string(tokens: list[str]) -> str:
+    """Build a tsquery OR-string with prefix matching: 'tok1:* | tok2:*'."""
+    return " | ".join(f"{t}:*" for t in tokens)
+
+
 def _build_tsquery(query: str):
     """AND logic: all words must be present. Uses plainto_tsquery for all cases."""
     return func.plainto_tsquery("russian", query)
