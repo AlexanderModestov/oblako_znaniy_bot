@@ -234,7 +234,10 @@ class SearchService:
         if level not in (1, 2):
             raise ValueError(f"Invalid search level: {level!r}. Must be 1 or 2.")
         if level == 1:
-            lessons, total = await self.fts_search(session, query, page=page)
+            if self.fuzzy_enabled:
+                lessons, total = await self.fts_search_fuzzy(session, query, page=page)
+            else:
+                lessons, total = await self.fts_search(session, query, page=page)
             return SearchResult(query=query, lessons=lessons, total=total, page=page, per_page=self.per_page)
 
         combined = await self._build_level_results(session, query, level)
@@ -251,6 +254,8 @@ class SearchService:
     async def get_all_lessons_for_level(self, session: AsyncSession, query: str, level: int) -> list[LessonResult]:
         """Get all lessons for a level without pagination — for clarification analysis."""
         if level == 1:
+            if self.fuzzy_enabled:
+                return await self.fts_search_all_fuzzy(session, query)
             return await self.fts_search_all(session, query)
         return await self._build_level_results(session, query, level)
 
