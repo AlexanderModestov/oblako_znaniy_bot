@@ -130,38 +130,53 @@ class SearchService:
         floor = self.fts_floor
         title_w = self.trigram_title_w
 
+        params: dict = {"ts": ts_str, "q": full_q, "thr": thr}
+        coverage_parts = []
+        for i, t in enumerate(tokens):
+            key = f"tok{i}"
+            params[key] = t if t.isdigit() else f"{t}:*"
+            coverage_parts.append(
+                f"(CASE WHEN search_vector @@ to_tsquery('russian', cast(:{key} as text)) "
+                "THEN 1 ELSE 0 END)"
+            )
+        coverage_expr = " + ".join(coverage_parts) if coverage_parts else "0"
+
         sql = text(f"""
             WITH fts AS (
                 SELECT id,
+                       ({coverage_expr}) AS coverage,
                        {floor} + {1 - floor} * LEAST(ts_rank(search_vector, to_tsquery('russian', cast(:ts as text))), 1.0) AS score
                 FROM lessons
                 WHERE search_vector @@ to_tsquery('russian', cast(:ts as text))
             ),
             trg AS (
                 SELECT id,
+                       0 AS coverage,
                        {title_w} * similarity(title, cast(:q as text)) AS score
                 FROM lessons
                 WHERE similarity(title, cast(:q as text)) > cast(:thr as float)
             ),
             merged AS (
-                SELECT id, MAX(score) AS score FROM (
-                    SELECT id, score FROM fts
+                SELECT id,
+                       MAX(coverage) AS coverage,
+                       MAX(score) AS score
+                FROM (
+                    SELECT id, coverage, score FROM fts
                     UNION ALL
-                    SELECT id, score FROM trg
+                    SELECT id, coverage, score FROM trg
                 ) u
                 GROUP BY id
             )
-            SELECT m.id, m.score
+            SELECT m.id, m.score, m.coverage
             FROM merged m
             JOIN lessons l ON l.id = m.id
             ORDER BY (CASE WHEN l.url = 'N/A' THEN 1 ELSE 0 END),
+                     m.coverage DESC,
                      m.score DESC,
                      m.id
         """)
 
-        rows = (await session.execute(
-            sql, {"ts": ts_str, "q": full_q, "thr": thr}
-        )).all()
+        rows = (await session.execute(sql, params)).all()
 
         total = len(rows)
         offset = (page - 1) * self.per_page
