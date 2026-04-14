@@ -129,15 +129,15 @@ class SearchService:
         sql = text(f"""
             WITH fts AS (
                 SELECT id,
-                       {floor} + {1 - floor} * LEAST(ts_rank(search_vector, to_tsquery('russian', :ts)), 1.0) AS score
+                       {floor} + {1 - floor} * LEAST(ts_rank(search_vector, to_tsquery('russian', cast(:ts as text))), 1.0) AS score
                 FROM lessons
-                WHERE search_vector @@ to_tsquery('russian', :ts)
+                WHERE search_vector @@ to_tsquery('russian', cast(:ts as text))
             ),
             trg AS (
                 SELECT id,
-                       {title_w} * similarity(title, :q) AS score
+                       {title_w} * similarity(title, cast(:q as text)) AS score
                 FROM lessons
-                WHERE similarity(title, :q) > :thr
+                WHERE similarity(title, cast(:q as text)) > cast(:thr as float)
             ),
             merged AS (
                 SELECT id, MAX(score) AS score FROM (
