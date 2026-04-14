@@ -326,7 +326,7 @@ async def test_fuzzy_search_includes_abbreviation_title_boost(mock_settings):
     mock_session = MagicMock()
     mock_session.execute = fake_execute
 
-    await service.fts_search_fuzzy(mock_session, "ВПР по химии", page=1)
+    await service.fts_search_fuzzy(mock_session, "впр по химии", page=1)
 
     assert "ILIKE" in captured["sql"]
     assert captured["params"].get("abbr0") == "%ВПР%"

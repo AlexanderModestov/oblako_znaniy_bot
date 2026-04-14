@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 _ABBR_RE = re.compile(r"^[А-ЯЁA-Z]{2,5}$")
 
+_KNOWN_ABBR = frozenset({"ВПР", "ЕГЭ", "ОГЭ", "ГИА", "ФИПИ", "ГВЭ", "ВОУД"})
+
 _TSQUERY_SPECIALS = re.compile(r"[&|!():*]")
 _SPLIT_RE = re.compile(r"\s+")
 
@@ -244,7 +246,10 @@ class SearchService:
 
         or_ts = _build_or_tsquery_string(tokens)
         weights = await _compute_idf(session, tokens)
-        abbr_words = [w for w in query.strip().split() if _ABBR_RE.match(w)]
+        abbr_words = [
+            w.upper() for w in query.strip().split()
+            if w.upper() in _KNOWN_ABBR
+        ]
 
         params: dict = {"or_ts": or_ts}
         score_parts: list[str] = []
@@ -261,7 +266,7 @@ class SearchService:
             key_abbr = f"abbr{i}"
             params[key_abbr] = f"%{abbr}%"
             score_parts.append(
-                f"(CASE WHEN l.title ILIKE cast(:{key_abbr} as text) THEN 2.0 ELSE 0 END)"
+                f"(CASE WHEN l.title ILIKE cast(:{key_abbr} as text) THEN 10.0 ELSE 0 END)"
             )
         score_expr = " + ".join(score_parts) if score_parts else "0"
 
