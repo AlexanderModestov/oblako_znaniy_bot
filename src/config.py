@@ -21,9 +21,6 @@ class Settings(BaseSettings):
     results_per_page: int = 5
     search_clarify_threshold: int = 10
     enable_fuzzy_search: bool = True
-    trigram_similarity_threshold: float = 0.3
-    trigram_title_weight: float = 1.0
-    fts_score_floor: float = 0.5
 
     class Config:
         env_file = ".env"

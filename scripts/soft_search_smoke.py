@@ -45,7 +45,6 @@ async def run_query(service: SearchService, query: str) -> None:
 async def main() -> None:
     settings = get_settings()
     print(f"enable_fuzzy_search = {settings.enable_fuzzy_search}")
-    print(f"trigram_threshold   = {settings.trigram_similarity_threshold}")
     service = SearchService()
     for q in QUERIES:
         await run_query(service, q)

@@ -13,9 +13,6 @@ def _make_mock_settings():
     settings.search_clarify_threshold = 10
     settings.openai_api_key = "test-key"
     settings.enable_fuzzy_search = False
-    settings.trigram_similarity_threshold = 0.3
-    settings.trigram_title_weight = 1.0
-    settings.fts_score_floor = 0.5
     return settings
 
 

@@ -15,6 +15,3 @@ def _make_settings() -> Settings:
 def test_fuzzy_search_defaults():
     s = _make_settings()
     assert s.enable_fuzzy_search is True
-    assert s.trigram_similarity_threshold == 0.3
-    assert s.trigram_title_weight == 1.0
-    assert s.fts_score_floor == 0.5
