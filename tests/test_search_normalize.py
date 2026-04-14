@@ -1,0 +1,21 @@
+from src.core.services.search import _normalize_tokens
+
+
+def test_normalize_splits_and_lowercases():
+    assert _normalize_tokens("Теорема Пифагора") == ["теорема", "пифагора"]
+
+
+def test_normalize_drops_single_char_non_digit():
+    assert _normalize_tokens("а теорема") == ["теорема"]
+
+
+def test_normalize_keeps_digits():
+    assert _normalize_tokens("7 класс") == ["7", "класс"]
+
+
+def test_normalize_strips_tsquery_specials():
+    assert _normalize_tokens("теорема & | ! ( ) : *") == ["теорема"]
+
+
+def test_normalize_empty_string():
+    assert _normalize_tokens("   ") == []

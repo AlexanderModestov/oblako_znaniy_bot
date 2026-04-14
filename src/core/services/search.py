@@ -14,6 +14,19 @@ logger = logging.getLogger(__name__)
 
 _ABBR_RE = re.compile(r"^[А-ЯЁA-Z]{2,5}$")
 
+_TSQUERY_SPECIALS = re.compile(r"[&|!():*]")
+_SPLIT_RE = re.compile(r"\s+")
+
+
+def _normalize_tokens(query: str) -> list[str]:
+    """Lowercase, strip tsquery specials, split into tokens,
+    drop single-char non-digit tokens."""
+    if not query:
+        return []
+    cleaned = _TSQUERY_SPECIALS.sub(" ", query.lower())
+    raw = [t.strip(".,;:!?\"'()[]{}") for t in _SPLIT_RE.split(cleaned)]
+    return [t for t in raw if t and (len(t) >= 2 or t.isdigit())]
+
 
 def _build_tsquery(query: str):
     """AND logic: all words must be present. Uses plainto_tsquery for all cases."""
