@@ -299,3 +299,58 @@ async def test_compute_idf_multidigit_kept():
 
     weights = await _compute_idf(mock_session, ["2024"])
     assert weights["2024"] > 0
+
+
+@pytest.mark.asyncio
+@patch("src.core.services.search.get_settings", side_effect=_make_mock_settings)
+async def test_fuzzy_search_includes_abbreviation_title_boost(mock_settings):
+    """Abbreviations in the raw query add an ILIKE title bonus to score."""
+    service = SearchService()
+    captured: dict = {}
+    first_call = [True]
+
+    async def fake_execute(sql, params=None):
+        # First execute from _compute_idf (count of lessons), then one per token.
+        if first_call[0]:
+            first_call[0] = False
+        r = MagicMock()
+        r.scalar = MagicMock(return_value=100)
+        r.all = MagicMock(return_value=[])
+        # Only capture the scoring SQL, which has ILIKE or ts_rank_cd.
+        sql_text = str(getattr(sql, "text", sql))
+        if "ts_rank_cd" in sql_text:
+            captured["sql"] = sql_text
+            captured["params"] = params
+        return r
+
+    mock_session = MagicMock()
+    mock_session.execute = fake_execute
+
+    await service.fts_search_fuzzy(mock_session, "ВПР по химии", page=1)
+
+    assert "ILIKE" in captured["sql"]
+    assert captured["params"].get("abbr0") == "%ВПР%"
+
+
+@pytest.mark.asyncio
+@patch("src.core.services.search.get_settings", side_effect=_make_mock_settings)
+async def test_fuzzy_search_no_abbreviation_no_boost(mock_settings):
+    """Queries without abbreviations must not add the ILIKE bonus."""
+    service = SearchService()
+    captured: dict = {}
+
+    async def fake_execute(sql, params=None):
+        r = MagicMock()
+        r.scalar = MagicMock(return_value=100)
+        r.all = MagicMock(return_value=[])
+        sql_text = str(getattr(sql, "text", sql))
+        if "ts_rank_cd" in sql_text:
+            captured["sql"] = sql_text
+        return r
+
+    mock_session = MagicMock()
+    mock_session.execute = fake_execute
+
+    await service.fts_search_fuzzy(mock_session, "второй закон ньютона", page=1)
+
+    assert "ILIKE" not in captured["sql"]

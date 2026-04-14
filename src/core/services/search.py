@@ -172,6 +172,13 @@ class SearchService:
         outweighs 'закон' so 'Второй закон Ньютона' beats 'Закон больших
         чисел' on the query '2 закон ньютона'.
 
+        Query abbreviations (ВПР, ЕГЭ, ОГЭ — anything matching
+        ``_ABBR_RE``) add a fixed +2.0 bonus when the row's title contains
+        them literally (ILIKE). The Snowball stemmer sometimes drops
+        short uppercase acronyms, so an abbreviation in title may not
+        surface via ``ts_rank_cd`` alone; the bonus keeps ВПР-titled
+        rows at the top for queries like ``впр по химии``.
+
         No prefix matching (Snowball stemmer handles morphology).
         No trigram fallback (removed 2026-04-14 after baseline showed it
         added noise for multi-word queries).
@@ -184,6 +191,7 @@ class SearchService:
 
         or_ts = _build_or_tsquery_string(tokens)
         weights = await _compute_idf(session, tokens)
+        abbr_words = [w for w in query.strip().split() if _ABBR_RE.match(w)]
 
         params: dict = {"or_ts": or_ts}
         score_parts: list[str] = []
@@ -195,6 +203,12 @@ class SearchService:
             score_parts.append(
                 f"(ts_rank_cd(l.search_vector, to_tsquery('russian', cast(:{key_tok} as text))) "
                 f"* cast(:{key_w} as float))"
+            )
+        for i, abbr in enumerate(abbr_words):
+            key_abbr = f"abbr{i}"
+            params[key_abbr] = f"%{abbr}%"
+            score_parts.append(
+                f"(CASE WHEN l.title ILIKE cast(:{key_abbr} as text) THEN 2.0 ELSE 0 END)"
             )
         score_expr = " + ".join(score_parts) if score_parts else "0"
 
