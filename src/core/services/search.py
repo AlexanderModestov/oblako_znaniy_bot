@@ -58,6 +58,38 @@ def _build_or_tsquery_string(tokens: list[str]) -> str:
     return " | ".join(tokens)
 
 
+async def _compute_idf(session, tokens: list[str]) -> dict[str, float]:
+    """Compute IDF weight per token against the ``lessons`` corpus.
+
+    Uses the natural log smoothed formula ``ln((N + 1) / (df + 1)) + 1``:
+    positive for any token (even one matching all rows, where it returns 1),
+    and strictly monotonic — rarer tokens always outweigh common ones.
+
+    One ``count(*)`` per token (GIN-indexed, cheap) plus one for N.
+    """
+    if not tokens:
+        return {}
+    import math
+
+    from sqlalchemy import text
+
+    total_row = await session.execute(text("SELECT COUNT(*) FROM lessons"))
+    n = total_row.scalar() or 0
+
+    weights: dict[str, float] = {}
+    for tok in tokens:
+        df_row = await session.execute(
+            text(
+                "SELECT COUNT(*) FROM lessons "
+                "WHERE search_vector @@ to_tsquery('russian', cast(:tok as text))"
+            ),
+            {"tok": tok},
+        )
+        df = df_row.scalar() or 0
+        weights[tok] = math.log((n + 1) / (df + 1)) + 1.0
+    return weights
+
+
 def _build_tsquery(query: str):
     """AND logic: all words must be present. Uses plainto_tsquery for all cases."""
     return func.plainto_tsquery("russian", query)

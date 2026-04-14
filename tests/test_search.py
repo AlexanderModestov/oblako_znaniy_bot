@@ -227,3 +227,38 @@ async def test_search_by_level_invalid_raises(mock_settings):
         await service.search_by_level(MagicMock(), "история", level=0)
     with pytest.raises(ValueError, match="Invalid search level"):
         await service.search_by_level(MagicMock(), "история", level=3)
+
+
+@pytest.mark.asyncio
+async def test_compute_idf_rarer_token_gets_higher_weight():
+    """Token with small df must get a strictly larger IDF than a token
+    with large df, given the same corpus size."""
+    from src.core.services.search import _compute_idf
+
+    mock_session = MagicMock()
+    # Scalar sequence: total_n, df_rare, df_common
+    scalars = iter([1000, 5, 500])
+
+    async def fake_execute(_q, _params=None):
+        result = MagicMock()
+        result.scalar = MagicMock(return_value=next(scalars))
+        return result
+
+    mock_session.execute = fake_execute
+
+    weights = await _compute_idf(mock_session, ["ньютон", "закон"])
+
+    assert weights["ньютон"] > weights["закон"]
+    assert weights["ньютон"] > 0
+    assert weights["закон"] > 0
+
+
+@pytest.mark.asyncio
+async def test_compute_idf_empty_tokens_returns_empty():
+    from src.core.services.search import _compute_idf
+
+    mock_session = MagicMock()
+    mock_session.execute = AsyncMock()  # should never be called
+    weights = await _compute_idf(mock_session, [])
+    assert weights == {}
+    mock_session.execute.assert_not_called()
