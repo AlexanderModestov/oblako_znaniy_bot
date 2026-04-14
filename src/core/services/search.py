@@ -54,6 +54,10 @@ class SearchService:
         self.similarity_threshold = settings.semantic_similarity_threshold
         self.per_page = settings.results_per_page
         self.clarify_threshold = settings.search_clarify_threshold
+        self.trigram_threshold = settings.trigram_similarity_threshold
+        self.trigram_title_w = settings.trigram_title_weight
+        self.fts_floor = settings.fts_score_floor
+        self.fuzzy_enabled = settings.enable_fuzzy_search
 
     async def fts_search(self, session: AsyncSession, query: str, page: int = 1) -> tuple[list[LessonResult], int]:
         ts_query = _build_tsquery(query)
@@ -89,6 +93,84 @@ class SearchService:
                 is_semantic=False,
             )
             for l in result.scalars().unique().all()
+        ]
+        return lessons, total
+
+    async def fts_search_fuzzy(
+        self, session: AsyncSession, query: str, page: int = 1
+    ) -> tuple[list[LessonResult], int]:
+        """OR-FTS with prefix, unioned with pg_trgm fallback on title.
+        Returns (page_results, total_count)."""
+        from sqlalchemy import text
+
+        tokens = _normalize_tokens(query)
+        if not tokens:
+            return [], 0
+
+        ts_str = _build_or_tsquery_string(tokens)
+        full_q = " ".join(tokens)
+        thr = self.trigram_threshold
+        floor = self.fts_floor
+        title_w = self.trigram_title_w
+
+        sql = text(f"""
+            WITH fts AS (
+                SELECT id,
+                       {floor} + {1 - floor} * LEAST(ts_rank(search_vector, to_tsquery('russian', :ts)), 1.0) AS score
+                FROM lessons
+                WHERE search_vector @@ to_tsquery('russian', :ts)
+            ),
+            trg AS (
+                SELECT id,
+                       {title_w} * similarity(title, :q) AS score
+                FROM lessons
+                WHERE similarity(title, :q) > :thr
+            ),
+            merged AS (
+                SELECT id, MAX(score) AS score FROM (
+                    SELECT id, score FROM fts
+                    UNION ALL
+                    SELECT id, score FROM trg
+                ) u
+                GROUP BY id
+            )
+            SELECT m.id, m.score
+            FROM merged m
+            JOIN lessons l ON l.id = m.id
+            ORDER BY (CASE WHEN l.url = 'N/A' THEN 1 ELSE 0 END),
+                     m.score DESC,
+                     m.id
+        """)
+
+        rows = (await session.execute(
+            sql, {"ts": ts_str, "q": full_q, "thr": thr}
+        )).all()
+
+        total = len(rows)
+        offset = (page - 1) * self.per_page
+        page_ids = [r.id for r in rows[offset:offset + self.per_page]]
+        if not page_ids:
+            return [], total
+
+        q = (
+            select(Lesson)
+            .options(joinedload(Lesson.subject))
+            .where(Lesson.id.in_(page_ids))
+        )
+        result = await session.execute(q)
+        by_id = {l.id: l for l in result.scalars().unique().all()}
+
+        lessons = [
+            LessonResult(
+                title=by_id[i].title, url=by_id[i].url,
+                description=by_id[i].description,
+                subject=by_id[i].subject.name,
+                grade=by_id[i].grade,
+                section=by_id[i].section,
+                topic=by_id[i].topic,
+                is_semantic=False,
+            )
+            for i in page_ids if i in by_id
         ]
         return lessons, total
 
