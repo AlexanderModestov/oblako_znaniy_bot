@@ -105,7 +105,11 @@ async def cmd_start(message: Message, state: FSMContext, session):
 
 @router.message(Command("help"))
 async def cmd_help(message: Message):
-    await message.answer(HELP_TEXT_HTML, parse_mode="HTML")
+    await message.answer(
+        HELP_TEXT_HTML,
+        parse_mode="HTML",
+        reply_markup=search_choice_keyboard(),
+    )
 
 
 @router.callback_query(OnboardingStates.consent, F.data == "onb_consent:yes")

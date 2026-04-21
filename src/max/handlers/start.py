@@ -156,7 +156,12 @@ async def cmd_start(event: MessageCreated, context: MemoryContext, session: Asyn
 
 @router.message_created(Command("help"))
 async def cmd_help(event: MessageCreated):
-    await event.message.answer(HELP_TEXT_MARKDOWN, parse_mode=ParseMode.MARKDOWN)
+    kb = search_choice_keyboard()
+    await event.message.answer(
+        HELP_TEXT_MARKDOWN,
+        parse_mode=ParseMode.MARKDOWN,
+        attachments=[kb.as_markup()],
+    )
 
 
 @router.message_callback(F.callback.payload == "onb_consent:yes", OnboardingStates.consent)
