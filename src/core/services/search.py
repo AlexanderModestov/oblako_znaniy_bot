@@ -1,5 +1,4 @@
 import logging
-import re
 
 from openai import AsyncOpenAI
 from sqlalchemy import case, func, select
@@ -12,30 +11,10 @@ from src.core.schemas import ClarifyOption, ClarifyResult, LessonResult, SearchR
 
 logger = logging.getLogger(__name__)
 
-_ABBR_RE = re.compile(r"^[А-ЯЁA-Z]{2,5}$")
-
 
 def _build_tsquery(query: str):
     """AND logic: all words must be present. Uses plainto_tsquery for all cases."""
     return func.plainto_tsquery("russian", query)
-
-
-def _build_or_tsquery(query: str):
-    """OR logic: any word may match. Returns None if query has no usable tokens."""
-    words = [w for w in re.findall(r"\w+", query, flags=re.UNICODE) if w]
-    if not words:
-        return None
-    expr = " | ".join(words)
-    return func.to_tsquery("russian", expr)
-
-
-def _abbr_filters(query: str):
-    """Return SQLAlchemy conditions requiring each abbreviation to appear literally in title."""
-    conditions = []
-    for word in query.strip().split():
-        if _ABBR_RE.match(word):
-            conditions.append(Lesson.title.ilike(f"%{word}%"))
-    return conditions
 
 
 class SearchService:
@@ -46,13 +25,11 @@ class SearchService:
         self.per_page = settings.results_per_page
         self.clarify_threshold = settings.search_clarify_threshold
 
-    async def _fts_count(self, session: AsyncSession, ts_query, abbr_conds) -> int:
+    async def _fts_count(self, session: AsyncSession, ts_query) -> int:
         count_q = select(func.count(Lesson.id)).where(Lesson.search_vector.op("@@")(ts_query))
-        for cond in abbr_conds:
-            count_q = count_q.where(cond)
         return (await session.execute(count_q)).scalar() or 0
 
-    async def _fts_fetch(self, session: AsyncSession, ts_query, abbr_conds, page: int | None = None) -> list[LessonResult]:
+    async def _fts_fetch(self, session: AsyncSession, ts_query, page: int | None = None) -> list[LessonResult]:
         na_last = case((Lesson.url == "N/A", 1), else_=0)
         q = (
             select(Lesson)
@@ -60,8 +37,6 @@ class SearchService:
             .where(Lesson.search_vector.op("@@")(ts_query))
             .order_by(na_last, func.ts_rank(Lesson.search_vector, ts_query).desc())
         )
-        for cond in abbr_conds:
-            q = q.where(cond)
         if page is not None:
             q = q.offset((page - 1) * self.per_page).limit(self.per_page)
         result = await session.execute(q)
@@ -79,21 +54,16 @@ class SearchService:
         ]
 
     async def fts_search(self, session: AsyncSession, query: str, page: int = 1) -> tuple[list[LessonResult], int]:
-        abbr_conds = _abbr_filters(query)
-        and_q = _build_tsquery(query)
-        total = await self._fts_count(session, and_q, abbr_conds)
-        if total > 0:
-            lessons = await self._fts_fetch(session, and_q, abbr_conds, page=page)
-            return lessons, total
-
-        or_q = _build_or_tsquery(query)
-        if or_q is None:
-            return [], 0
-        total = await self._fts_count(session, or_q, abbr_conds)
+        ts_query = _build_tsquery(query)
+        total = await self._fts_count(session, ts_query)
         if total == 0:
             return [], 0
-        lessons = await self._fts_fetch(session, or_q, abbr_conds, page=page)
+        lessons = await self._fts_fetch(session, ts_query, page=page)
         return lessons, total
+
+    async def fts_search_all(self, session: AsyncSession, query: str) -> list[LessonResult]:
+        ts_query = _build_tsquery(query)
+        return await self._fts_fetch(session, ts_query)
 
     async def semantic_search(self, session: AsyncSession, query: str, exclude_ids: list[int] | None = None, limit: int = 10) -> list[LessonResult]:
         try:
@@ -224,18 +194,3 @@ class SearchService:
             return ClarifyResult(level=level, options=options, message=message, total=total)
 
         return None
-
-    async def fts_search_all(self, session: AsyncSession, query: str) -> list[LessonResult]:
-        """Fetch all FTS results without pagination (for clarification analysis).
-
-        Uses the same AND → OR fallback as fts_search.
-        """
-        abbr_conds = _abbr_filters(query)
-        and_q = _build_tsquery(query)
-        lessons = await self._fts_fetch(session, and_q, abbr_conds)
-        if lessons:
-            return lessons
-        or_q = _build_or_tsquery(query)
-        if or_q is None:
-            return []
-        return await self._fts_fetch(session, or_q, abbr_conds)

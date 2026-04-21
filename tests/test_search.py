@@ -5,6 +5,14 @@ from src.core.schemas import LessonResult, ClarifyOption, ClarifyResult
 from src.core.services.search import SearchService, _build_tsquery
 
 
+def test_build_tsquery_always_uses_plainto():
+    """No OR tsquery helper should exist; AND-only via plainto_tsquery."""
+    from src.core.services import search as search_mod
+    assert not hasattr(search_mod, "_build_or_tsquery")
+    assert not hasattr(search_mod, "_abbr_filters")
+    assert not hasattr(search_mod, "_ABBR_RE")
+
+
 def _make_mock_settings():
     settings = MagicMock()
     settings.fts_min_results = 3
