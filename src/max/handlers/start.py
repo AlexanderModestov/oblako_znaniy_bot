@@ -9,6 +9,7 @@ from maxapi.utils.formatting import Link, Text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
+from src.core.help_text import HELP_TEXT
 from src.core.schemas import UserCreate
 from src.core.services.user import UserService
 from src.max.keyboards import (
@@ -151,6 +152,11 @@ async def cmd_start(event: MessageCreated, context: MemoryContext, session: Asyn
         f"С возвращением, {user.full_name}!\n\nВыберите способ поиска:",
         attachments=[kb.as_markup()],
     )
+
+
+@router.message_created(Command("help"))
+async def cmd_help(event: MessageCreated):
+    await event.message.answer(HELP_TEXT)
 
 
 @router.message_callback(F.callback.payload == "onb_consent:yes", OnboardingStates.consent)

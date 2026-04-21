@@ -1,7 +1,7 @@
 import logging
 
 from aiogram import F, Router
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
@@ -14,6 +14,7 @@ from aiogram.types import (
 )
 
 from src.config import get_settings
+from src.core.help_text import HELP_TEXT
 from src.core.schemas import UserCreate
 from src.core.services.user import UserService
 from src.telegram.keyboards import (
@@ -100,6 +101,11 @@ async def cmd_start(message: Message, state: FSMContext, session):
         [InlineKeyboardButton(text="Не согласен", callback_data="onb_consent:no")],
     ])
     await message.answer(CONSENT_TEXT, reply_markup=consent_kb)
+
+
+@router.message(Command("help"))
+async def cmd_help(message: Message):
+    await message.answer(HELP_TEXT)
 
 
 @router.callback_query(OnboardingStates.consent, F.data == "onb_consent:yes")
