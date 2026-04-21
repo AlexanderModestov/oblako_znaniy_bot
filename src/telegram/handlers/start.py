@@ -14,7 +14,7 @@ from aiogram.types import (
 )
 
 from src.config import get_settings
-from src.core.help_text import HELP_TEXT
+from src.core.help_text import HELP_TEXT_HTML
 from src.core.schemas import UserCreate
 from src.core.services.user import UserService
 from src.telegram.keyboards import (
@@ -105,7 +105,7 @@ async def cmd_start(message: Message, state: FSMContext, session):
 
 @router.message(Command("help"))
 async def cmd_help(message: Message):
-    await message.answer(HELP_TEXT)
+    await message.answer(HELP_TEXT_HTML, parse_mode="HTML")
 
 
 @router.callback_query(OnboardingStates.consent, F.data == "onb_consent:yes")
